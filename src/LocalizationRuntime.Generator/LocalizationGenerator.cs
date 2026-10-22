@@ -310,22 +310,130 @@ namespace LocalizationRuntime.Generator
             sb.AppendLine(";");
             sb.AppendLine();
             sb.AppendLine("/// <summary>编译期键 id。由生成器产出，不要手写。</summary>");
-            sb.Append("internal static class ");
-            sb.Append(model.ClassName);
-            sb.AppendLine("Keys");
+            sb.AppendLine("internal static class Keys");
             sb.AppendLine("{");
 
+            // 按 JSON 层级递归建嵌套静态类：
+            //   MainWindow.UserInfo.UserName
+            // 变成
+            //   LKeys.MainWindow.UserInfo.UserName
+            var root = new KeyNode(null);
             foreach (var key in model.Keys)
             {
-                sb.Append("    public const int ");
-                sb.Append(Sanitize(key.Path));
-                sb.Append(" = ");
-                sb.Append(key.Id.ToString(CultureInfo.InvariantCulture));
-                sb.AppendLine(";");
+                root.Add(key.Path, key.Id);
             }
+
+            EmitKeyNodes(sb, root, "    ");
 
             sb.AppendLine("}");
             return sb.ToString();
+        }
+
+        /// <summary>键路径树：每个节点要么有子节点（生成嵌套类），要么是叶子（生成 const int）。</summary>
+        private sealed class KeyNode
+        {
+            internal KeyNode(string? name)
+            {
+                Name = name;
+            }
+
+            internal string? Name { get; }
+
+            /// <summary>叶子节点对应的键 id；非叶子为 null。</summary>
+            internal int? Id { get; set; }
+
+            internal List<KeyNode> Children { get; } = new List<KeyNode>();
+
+            internal KeyNode GetOrAddChild(string name)
+            {
+                for (var i = 0; i < Children.Count; i++)
+                {
+                    if (string.Equals(Children[i].Name, name, StringComparison.Ordinal))
+                    {
+                        return Children[i];
+                    }
+                }
+
+                var child = new KeyNode(name);
+                Children.Add(child);
+                return child;
+            }
+
+            internal void Add(string path, int id)
+            {
+                var segments = path.Split('.');
+                var node = this;
+
+                for (var i = 0; i < segments.Length; i++)
+                {
+                    var isLast = i == segments.Length - 1;
+
+                    // 数组元素（Tabs.0、MainWindow.Tabs.3）：整段压平成 Tabs_0，
+                    // 挂到"再上一级"节点下，避免生成 LKeys.Tabs._0 这种名字。
+                    if (!isLast && IsAllDigits(segments[i + 1]))
+                    {
+                        var flat = segments[i] + "_" + segments[i + 1];
+                        var rest = i + 2;
+                        while (rest < segments.Length)
+                        {
+                            flat = flat + "_" + segments[rest];
+                            rest++;
+                        }
+
+                        var listLeaf = node.GetOrAddChild(flat);
+                        listLeaf.Id = id;
+                        return;
+                    }
+
+                    if (isLast)
+                    {
+                        var leaf = node.GetOrAddChild(segments[i]);
+                        leaf.Id = id;
+                        return;
+                    }
+
+                    node = node.GetOrAddChild(segments[i]);
+                }
+            }
+        }
+
+        private static void EmitKeyNodes(StringBuilder sb, KeyNode node, string indent)
+        {
+            // 叶子优先：有 id 就产出常量
+            if (node.Id.HasValue)
+            {
+                sb.Append(indent);
+                sb.Append("public const int ");
+                sb.Append(Sanitize(node.Name!));
+                sb.Append(" = ");
+                sb.Append(node.Id.Value.ToString(CultureInfo.InvariantCulture));
+                sb.AppendLine(";");
+            }
+
+            foreach (var child in node.Children)
+            {
+                // 子节点若是叶子且与父同名（不会发生），或只是纯叶子，都直接产出常量
+                if (child.Children.Count == 0)
+                {
+                    sb.Append(indent);
+                    sb.Append("public const int ");
+                    sb.Append(Sanitize(child.Name!));
+                    sb.Append(" = ");
+                    sb.Append(child.Id.GetValueOrDefault().ToString(CultureInfo.InvariantCulture));
+                    sb.AppendLine(";");
+                    continue;
+                }
+
+                sb.Append(indent);
+                sb.Append("public static class ");
+                sb.Append(Sanitize(child.Name!));
+                sb.AppendLine();
+                sb.Append(indent);
+                sb.AppendLine("{");
+                EmitKeyNodes(sb, child, indent + "    ");
+                sb.Append(indent);
+                sb.AppendLine("}");
+            }
         }
 
         private static string EmitCatalog(ResourceModel model)
@@ -494,7 +602,7 @@ namespace LocalizationRuntime.Generator
 
         private static void EmitAccessors(StringBuilder sb, ResourceModel model)
         {
-            var keysClass = model.ClassName + "Keys";
+            var keysClass = "Keys";
 
             sb.Append("internal sealed partial class ");
             sb.Append(model.ClassName);
@@ -678,7 +786,7 @@ namespace LocalizationRuntime.Generator
             sb.Append(", ");
             sb.Append(keysClass);
             sb.Append('.');
-            sb.Append(Sanitize(member.FirstPath));
+            sb.Append(KeyAccessPath(member.FirstPath));
             if (member.IsList)
             {
                 sb.Append(", ");
@@ -838,6 +946,51 @@ namespace LocalizationRuntime.Generator
             }
 
             return char.IsDigit(result[0]) ? "_" + result : result;
+        }
+
+        /// <summary>
+        /// 把点分键路径转成嵌套静态类的访问路径，与 <see cref="KeyNode.Add"/> 保持一致：
+        ///   App.Title          → App.Title
+        ///   MainWindow.Tabs.0  → MainWindow.Tabs_0
+        /// </summary>
+        private static string KeyAccessPath(string path)
+        {
+            var segments = path.Split('.');
+            var sb = new StringBuilder(path.Length + 8);
+
+            for (var i = 0; i < segments.Length; i++)
+            {
+                var isLast = i == segments.Length - 1;
+
+                if (!isLast && IsAllDigits(segments[i + 1]))
+                {
+                    // 数组：Tabs + 0 [+ 后续] → Tabs_0
+                    var flat = segments[i];
+                    var rest = i + 1;
+                    while (rest < segments.Length)
+                    {
+                        flat = flat + "_" + segments[rest];
+                        rest++;
+                    }
+
+                    if (sb.Length > 0)
+                    {
+                        sb.Append('.');
+                    }
+
+                    sb.Append(Sanitize(flat));
+                    return sb.ToString();
+                }
+
+                if (sb.Length > 0)
+                {
+                    sb.Append('.');
+                }
+
+                sb.Append(Sanitize(segments[i]));
+            }
+
+            return sb.ToString();
         }
 
         private static string Literal(string value)
