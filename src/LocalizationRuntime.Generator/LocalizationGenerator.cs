@@ -95,6 +95,9 @@ namespace LocalizationRuntime.Generator
                     continue;
                 }
 
+                // 结构与命名约束：空容器、null、点号键、混合数组、非大驼峰
+                ShapeValidator.Validate(root, string.Empty, file.Path, diagnostics);
+
                 parsed.Add(new ParsedFile(file.Culture, file.Path, ResourceFlattener.Flatten(root)));
             }
 

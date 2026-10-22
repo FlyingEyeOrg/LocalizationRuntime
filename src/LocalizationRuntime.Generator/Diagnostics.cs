@@ -78,6 +78,46 @@ namespace LocalizationRuntime.Generator
             DiagnosticSeverity.Warning,
             isEnabledByDefault: true);
 
+        public static readonly DiagnosticDescriptor EmptyContainer = new DiagnosticDescriptor(
+            "LR1010",
+            "空对象或空数组",
+            "{0}",
+            Category,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true);
+
+        public static readonly DiagnosticDescriptor NullValue = new DiagnosticDescriptor(
+            "LR1011",
+            "值必须是非 null 字符串",
+            "{0}",
+            Category,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true);
+
+        public static readonly DiagnosticDescriptor KeyContainsDot = new DiagnosticDescriptor(
+            "LR1012",
+            "键名不能包含点号",
+            "{0}",
+            Category,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true);
+
+        public static readonly DiagnosticDescriptor HeterogeneousArray = new DiagnosticDescriptor(
+            "LR1013",
+            "数组元素类型必须一致",
+            "{0}",
+            Category,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true);
+
+        public static readonly DiagnosticDescriptor InvalidIdentifier = new DiagnosticDescriptor(
+            "LR1014",
+            "键名不是合法的 C# 标识符",
+            "{0}",
+            Category,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true);
+
         public static readonly DiagnosticDescriptor[] All =
         {
             NoCultureFiles,
@@ -88,7 +128,12 @@ namespace LocalizationRuntime.Generator
             ExtraKey,
             MissingKey,
             PlaceholderMismatch,
-            EmptyValue
+            EmptyValue,
+            EmptyContainer,
+            NullValue,
+            KeyContainsDot,
+            HeterogeneousArray,
+            InvalidIdentifier
         };
 
         public static DiagnosticDescriptor? Find(string id)
