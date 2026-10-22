@@ -566,12 +566,12 @@ namespace LocalizationRuntime.Generator
                 sb.AppendLine();
                 sb.Append("        internal ");
                 sb.Append(typeName);
-                sb.AppendLine("(global::LocalizationRuntime.LocalizationTable t)");
+                sb.AppendLine("(global::LocalizationRuntime.Localizer t)");
                 sb.AppendLine("        {");
                 sb.AppendLine("            _t = t;");
                 sb.AppendLine("        }");
                 sb.AppendLine();
-                sb.AppendLine("        private readonly global::LocalizationRuntime.LocalizationTable _t;");
+                sb.AppendLine("        private readonly global::LocalizationRuntime.Localizer _t;");
                 sb.AppendLine();
 
                 // 惰性创建：只有真正被读到的键才分配响应单元，
@@ -588,14 +588,14 @@ namespace LocalizationRuntime.Generator
             // 根级键：直接作为门面类的属性
             foreach (var m in rootMembers)
             {
-                EmitLazyMember(sb, m, keysClass, "Table", "    ");
+                EmitLazyMember(sb, m, keysClass, "Localizer", "    ");
             }
 
             sb.Append("    public ");
             sb.Append(model.ClassName);
-            sb.AppendLine("(global::LocalizationRuntime.LocalizationTable table)");
+            sb.AppendLine("(global::LocalizationRuntime.Localizer localizer)");
             sb.AppendLine("    {");
-            sb.AppendLine("        Table = table;");
+            sb.AppendLine("        Localizer = localizer;");
 
             foreach (var group in order)
             {
@@ -604,12 +604,12 @@ namespace LocalizationRuntime.Generator
                 sb.Append(name);
                 sb.Append(" = new ");
                 sb.Append(GroupTypeName(group));
-                sb.AppendLine("(table);");
+                sb.AppendLine("(localizer);");
             }
 
             sb.AppendLine("    }");
             sb.AppendLine();
-            sb.AppendLine("    public global::LocalizationRuntime.LocalizationTable Table { get; }");
+            sb.AppendLine("    public global::LocalizationRuntime.Localizer Localizer { get; }");
             sb.AppendLine();
 
             foreach (var group in order)

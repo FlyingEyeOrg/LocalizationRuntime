@@ -10,12 +10,12 @@ namespace LocalizationRuntime
     /// </summary>
     public sealed class LocalizedText
     {
-        private readonly LocalizationTable _table;
+        private readonly Localizer _table;
         private readonly int _id;
 
-        public LocalizedText(LocalizationTable table, int id)
+        public LocalizedText(Localizer localizer, int id)
         {
-            _table = table ?? throw new ArgumentNullException(nameof(table));
+            _table = localizer ?? throw new ArgumentNullException(nameof(localizer));
             _id = id;
         }
 
@@ -50,16 +50,16 @@ namespace LocalizationRuntime
             internal readonly string[] Items;
         }
 
-        private readonly LocalizationTable _table;
+        private readonly Localizer _table;
         private readonly int _baseId;
         private readonly int _length;
         private readonly object _sync = new object();
 
         private Cache? _cache;
 
-        public LocalizedList(LocalizationTable table, int baseId, int length)
+        public LocalizedList(Localizer localizer, int baseId, int length)
         {
-            _table = table ?? throw new ArgumentNullException(nameof(table));
+            _table = localizer ?? throw new ArgumentNullException(nameof(localizer));
             _baseId = baseId;
             _length = length;
         }

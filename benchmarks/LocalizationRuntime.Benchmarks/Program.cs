@@ -19,8 +19,8 @@ namespace LocalizationRuntime.Benchmarks
             // ---- 启动成本：客户端最敏感的一段 ----
             var swStartup = Stopwatch.StartNew();
             var catalog = L.Catalog;                       // 触发 GeneratedCatalog 的静态构造：建全部语言的表
-            var table0 = new LocalizationTable(catalog, CultureInfo.GetCultureInfo("zh-CN"));
-            var l0 = new L(table0);                        // 创建访问器（惰性，不建对象）
+            var localizer0 = new Localizer(catalog, CultureInfo.GetCultureInfo("zh-CN"));
+            var l0 = new L(localizer0);                        // 创建访问器（惰性，不建对象）
             swStartup.Stop();
 
             Console.WriteLine("========== 启动 ==========");
@@ -31,14 +31,14 @@ namespace LocalizationRuntime.Benchmarks
 
             // 首次解析一张未缓存的语言表（模拟切到从未用过的语言）
             var swFirstSwitch = Stopwatch.StartNew();
-            table0.SetCulture(CultureInfo.GetCultureInfo("en-US"));
+            localizer0.SetCulture(CultureInfo.GetCultureInfo("en-US"));
             swFirstSwitch.Stop();
             Console.WriteLine("首次切到未缓存语言: " +
                               swFirstSwitch.Elapsed.TotalMilliseconds.ToString("N3", CultureInfo.InvariantCulture) + " ms");
             Console.WriteLine();
             Console.WriteLine("========== 热路径 ==========");
 
-            var table = table0;
+            var localizer = localizer0;
             var l = l0;
 
             Console.WriteLine("迭代次数    : " + Iterations.ToString("N0", CultureInfo.InvariantCulture));
@@ -46,11 +46,11 @@ namespace LocalizationRuntime.Benchmarks
 
             // 预热，避免把 JIT 时间算进去
             RunGet(l, 1_000_000);
-            RunGetByKey(table, 200_000);
+            RunGetByKey(localizer, 200_000);
             RunFormat(l, 100_000);
 
             Measure("Get(id) 命中", Iterations, () => RunGet(l, Iterations));
-            Measure("Get(string) 命中", Iterations / 4, () => RunGetByKey(table, Iterations / 4));
+            Measure("Get(string) 命中", Iterations / 4, () => RunGetByKey(localizer, Iterations / 4));
             Measure("LocalizedText.Value（惰性创建后）", Iterations / 4, () => RunFormat(l, Iterations / 4));
 
             Measure("LocalizedList.Value 命中缓存", Iterations / 4, () => RunList(l, Iterations / 4));
@@ -67,7 +67,7 @@ namespace LocalizationRuntime.Benchmarks
             var sw = Stopwatch.StartNew();
             for (var i = 0; i < switches; i++)
             {
-                table.SetCulture(cultures[i % 3]);
+                localizer.SetCulture(cultures[i % 3]);
             }
 
             sw.Stop();
@@ -87,7 +87,7 @@ namespace LocalizationRuntime.Benchmarks
             Sink = sink;
         }
 
-        private static void RunGetByKey(LocalizationTable t, int n)
+        private static void RunGetByKey(Localizer t, int n)
         {
             var sink = 0;
             for (var i = 0; i < n; i++)

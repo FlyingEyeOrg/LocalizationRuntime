@@ -6,16 +6,16 @@ using System.Threading;
 namespace LocalizationRuntime
 {
     /// <summary>
-    /// 运行期状态：持有当前语言，按 key 取值。
+    /// 本地化入口：持有当前语言，按 key 取值。
     ///
     /// 两件事：用 <see cref="Get(int)"/> / <see cref="Get(string)"/> 取当前语言的值，
     /// 用 <see cref="SetCulture(CultureInfo)"/> 切换语言。切换后再次取值自然得到新语言的值。
     ///
-    /// 唯一可变的是 <see cref="_snapshot"/> 这一个引用：表、culture、版本号一起换，
+    /// 唯一可变的是 <see cref="_snapshot"/> 这一个引用：值数组、culture、版本号一起换，
     /// 读者只会看到完整的旧值或完整的新值，不会读到撕裂的中间态。
     /// 切换无 IO，因此是同步的。
     /// </summary>
-    public sealed class LocalizationTable
+    public sealed class Localizer
     {
         private sealed class Snapshot
         {
@@ -40,12 +40,12 @@ namespace LocalizationRuntime
         private Snapshot _snapshot;
         private int _nextRevision;
 
-        public LocalizationTable(ILocalizationCatalog catalog)
+        public Localizer(ILocalizationCatalog catalog)
             : this(catalog, null)
         {
         }
 
-        public LocalizationTable(ILocalizationCatalog catalog, CultureInfo? initialCulture)
+        public Localizer(ILocalizationCatalog catalog, CultureInfo? initialCulture)
         {
             _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
 

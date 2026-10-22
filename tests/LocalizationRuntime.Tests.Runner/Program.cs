@@ -15,7 +15,7 @@ namespace LocalizationRuntime.Tests.Runner
     {
         private static int Main()
         {
-            var assembly = typeof(LocalizationTableTests).Assembly;
+            var assembly = typeof(LocalizerTests).Assembly;
             var facts = new List<(Type Type, MethodInfo Method)>();
 
             foreach (var type in assembly.GetTypes())

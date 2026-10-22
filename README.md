@@ -3,20 +3,20 @@
 编译期固化多语言资源的 .NET 本地化运行时。运行时**不加载任何资源文件、不做 JSON 解析**，只做一次数组索引。
 
 ```csharp
-var table = new LocalizationTable(L.Catalog);   // 按系统 culture 自动选语言
-var l = new L(table);
+var localizer = new Localizer(L.Catalog);   // 按系统 culture 自动选语言
+var l = new L(localizer);
 
 l.App.Title.Value;                              // "退刀管控系统"
-table.SetCulture(CultureInfo.GetCultureInfo("en-US"));
+localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
 l.App.Title.Value;                              // "Tool Retraction Control"
 ```
 
 核心只有两件事：**按 key 取当前语言的值**，**设置当前语言**。
 
 ```csharp
-table.Get(LKeys.App_Title);                     // 编译期 id，最快
-table.Get("App.Title");                         // 字符串 key
-table.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
+localizer.Get(LKeys.App_Title);                     // 编译期 id，最快
+localizer.Get("App.Title");                         // 字符串 key
+localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
 ```
 
 没有通知、没有订阅、没有弱引用。切语言后再次取值自然就是新语言的值——
@@ -84,11 +84,11 @@ internal sealed class L                 // 强类型访问器
 
 ```csharp
 // 控制台 / 服务：直接再读一次
-table.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
+localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
 Console.WriteLine(l.App.Title.Value);
 
 // WPF：切语言后自行触发一次重读，例如重新查询 VM 的属性
-table.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
+localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
 viewModel.RefreshLocalizedText();
 ```
 
