@@ -367,32 +367,32 @@ namespace LocalizationRuntime.Generator
                 for (var i = 0; i < segments.Length; i++)
                 {
                     var isLast = i == segments.Length - 1;
+                    var segment = segments[i];
 
-                    // 数组元素（Tabs.0、MainWindow.Tabs.3）：整段压平成 Tabs_0，
-                    // 挂到"再上一级"节点下，避免生成 TextIds.Tabs._0 这种名字。
-                    if (!isLast && IsAllDigits(segments[i + 1]))
+                    // 数字段是数组下标，不能作标识符，统一映射成 Item{N}：
+                    //   Tabs.0          → Tabs.Item0
+                    //   Menus.0.Header  → Menus.Item0.Header
+                    //   Menus.0.Items.0 → Menus.Item0.Items.Item0
+                    if (IsAllDigits(segment))
                     {
-                        var flat = segments[i] + "_" + segments[i + 1];
-                        var rest = i + 2;
-                        while (rest < segments.Length)
+                        var itemName = "Item" + segment;
+                        if (isLast)
                         {
-                            flat = flat + "_" + segments[rest];
-                            rest++;
+                            node.GetOrAddChild(itemName).Id = id;
+                            return;
                         }
 
-                        var listLeaf = node.GetOrAddChild(flat);
-                        listLeaf.Id = id;
-                        return;
+                        node = node.GetOrAddChild(itemName);
+                        continue;
                     }
 
                     if (isLast)
                     {
-                        var leaf = node.GetOrAddChild(segments[i]);
-                        leaf.Id = id;
+                        node.GetOrAddChild(segment).Id = id;
                         return;
                     }
 
-                    node = node.GetOrAddChild(segments[i]);
+                    node = node.GetOrAddChild(segment);
                 }
             }
         }
@@ -960,34 +960,15 @@ namespace LocalizationRuntime.Generator
 
             for (var i = 0; i < segments.Length; i++)
             {
-                var isLast = i == segments.Length - 1;
-
-                if (!isLast && IsAllDigits(segments[i + 1]))
-                {
-                    // 数组：Tabs + 0 [+ 后续] → Tabs_0
-                    var flat = segments[i];
-                    var rest = i + 1;
-                    while (rest < segments.Length)
-                    {
-                        flat = flat + "_" + segments[rest];
-                        rest++;
-                    }
-
-                    if (sb.Length > 0)
-                    {
-                        sb.Append('.');
-                    }
-
-                    sb.Append(Sanitize(flat));
-                    return sb.ToString();
-                }
+                var segment = segments[i];
 
                 if (sb.Length > 0)
                 {
                     sb.Append('.');
                 }
 
-                sb.Append(Sanitize(segments[i]));
+                // 与 KeyNode.Add 保持一致：数字段 → Item{N}
+                sb.Append(IsAllDigits(segment) ? "Item" + segment : Sanitize(segment));
             }
 
             return sb.ToString();

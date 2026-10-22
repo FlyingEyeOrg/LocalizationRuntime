@@ -68,7 +68,11 @@ internal static class TextIds            // 键 → 编译期 id，结构与 JSO
     public static class MainWindow
     {
         public const int Title = 16;
-        public const int Tabs_0 = 5;     // 数组元素压平成 Tabs_0
+        public static class Tabs
+        {
+            public const int Item0 = 5;     // 数组下标 → Item{N}
+            public const int Item10 = 15;
+        }
     }
 }
 internal sealed class GeneratedCatalog  // 每语言一个 string?[]（缺键为 null）
@@ -80,7 +84,16 @@ internal sealed class L                 // 强类型访问器
 ```
 
 键的层级与 JSON 完全对应，所以 `MainWindow.UserInfo.UserName` 就是 `TextIds.MainWindow.UserInfo.UserName`。
-数组元素无法作为合法标识符，压平成 `Tabs_0` / `Tabs_10`。
+
+数字段不能作标识符，统一映射成 `Item{N}`，层级不受影响：
+
+| JSON | 生成的键 |
+|---|---|
+| `"Tabs": ["a", "b"]` | `TextIds.MainWindow.Tabs.Item0` |
+| `"Menus": [{ "Header": "文件" }]` | `TextIds.Menus.Item0.Header` |
+| `"Menus": [{ "Items": ["新建"] }]` | `TextIds.Menus.Item0.Items.Item0` |
+
+对象数组（数组里是对象）会完整展开，每个元素一个 `Item{N}` 类，字段照常嵌套。
 
 访问器分两类：
 
