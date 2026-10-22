@@ -86,6 +86,12 @@ namespace LocalizationRuntime
             get { return _keys; }
         }
 
+        /// <summary>已注册的响应单元数量。诊断用。</summary>
+        public int ResponseUnitCount
+        {
+            get { return Volatile.Read(ref _units).Length; }
+        }
+
         public bool IsSupported(string cultureName)
         {
             return !string.IsNullOrEmpty(cultureName) && _supported.Contains(cultureName);

@@ -16,11 +16,33 @@ namespace LocalizationRuntime.Benchmarks
 
         private static void Main()
         {
-            var table = new LocalizationTable(L.Catalog, CultureInfo.GetCultureInfo("zh-CN"));
-            var l = new L(table);
+            // ---- 启动成本：客户端最敏感的一段 ----
+            var swStartup = Stopwatch.StartNew();
+            var catalog = L.Catalog;                       // 触发 GeneratedCatalog 的静态构造：建全部语言的表
+            var table0 = new LocalizationTable(catalog, CultureInfo.GetCultureInfo("zh-CN"));
+            var l0 = new L(table0);                        // 创建全部响应单元
+            swStartup.Stop();
 
-            Console.WriteLine("键数量      : " + table.Keys.Count);
+            Console.WriteLine("========== 启动 ==========");
+            Console.WriteLine("首次访问 catalog + 建表 + 建单元: " +
+                              swStartup.Elapsed.TotalMilliseconds.ToString("N2", CultureInfo.InvariantCulture) + " ms");
+            Console.WriteLine("键数量      : " + table0.Keys.Count);
             Console.WriteLine("语言数量    : " + L.Catalog.CultureNames.Count);
+            Console.WriteLine("响应单元数  : " + table0.ResponseUnitCount);
+            Console.WriteLine();
+
+            // 首次解析一张未缓存的语言表（模拟切到从未用过的语言）
+            var swFirstSwitch = Stopwatch.StartNew();
+            table0.SetCulture(CultureInfo.GetCultureInfo("en-US"));
+            swFirstSwitch.Stop();
+            Console.WriteLine("首次切到未缓存语言: " +
+                              swFirstSwitch.Elapsed.TotalMilliseconds.ToString("N3", CultureInfo.InvariantCulture) + " ms");
+            Console.WriteLine();
+            Console.WriteLine("========== 热路径 ==========");
+
+            var table = table0;
+            var l = l0;
+
             Console.WriteLine("迭代次数    : " + Iterations.ToString("N0", CultureInfo.InvariantCulture));
             Console.WriteLine();
 

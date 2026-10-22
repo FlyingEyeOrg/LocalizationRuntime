@@ -382,15 +382,33 @@ namespace LocalizationRuntime.Generator
 
             sb.AppendLine("    public string?[]? GetTable(string cultureName)");
             sb.AppendLine("    {");
+            sb.AppendLine("        string?[]? t;");
             sb.AppendLine("        switch (cultureName)");
             sb.AppendLine("        {");
             for (var i = 0; i < model.Cultures.Length; i++)
             {
                 sb.Append("            case ");
                 sb.Append(Literal(model.Cultures[i].Name));
-                sb.Append(": return Table");
+                sb.Append(": t = Table");
                 sb.Append(i.ToString(CultureInfo.InvariantCulture));
-                sb.AppendLine(";");
+                sb.AppendLine("; break;");
+            }
+
+            sb.AppendLine("            default: return null;");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            sb.AppendLine("        if (t != null) return t;");
+            sb.AppendLine();
+            sb.AppendLine("        switch (cultureName)");
+            sb.AppendLine("        {");
+            for (var i = 0; i < model.Cultures.Length; i++)
+            {
+                var suffix = i.ToString(CultureInfo.InvariantCulture);
+                sb.Append("            case ");
+                sb.Append(Literal(model.Cultures[i].Name));
+                sb.Append(": return Table");
+                sb.Append(suffix);
+                sb.AppendLine(" = CreateTable" + suffix + "();");
             }
 
             sb.AppendLine("            default: return null;");
@@ -404,8 +422,9 @@ namespace LocalizationRuntime.Generator
         }
 
         /// <summary>
-        /// 每语言一张表。元素多时拆成多个填充方法：单个 IL 方法体上限 64KB，
-        /// 全塞进一个方法会在大资源集上直接编译失败。
+        /// 每语言一张表，惰性创建：只有该语言第一次被请求时才填充数组，
+        /// 因此启动开销与"当前语言"成正比，而不是与"语言总数"成正比。
+        /// 元素多时拆成多个填充方法：单个 IL 方法体上限 64KB。
         /// </summary>
         private static void EmitTable(StringBuilder sb, CultureTable culture, int cultureIndex)
         {
@@ -414,11 +433,9 @@ namespace LocalizationRuntime.Generator
             var values = culture.Values;
             var total = values.Length;
 
-            sb.Append("    private static readonly string?[] ");
+            sb.Append("    private static string?[]? ");
             sb.Append(field);
-            sb.Append(" = Create");
-            sb.Append(field);
-            sb.AppendLine("();");
+            sb.AppendLine(";");
             sb.AppendLine();
 
             var chunk = total <= 400 ? Math.Max(1, total) : 400;
@@ -546,41 +563,24 @@ namespace LocalizationRuntime.Generator
                 sb.AppendLine();
                 sb.AppendLine("    {");
 
-                foreach (var m in members)
-                {
-                    sb.Append("        public global::LocalizationRuntime.");
-                    sb.Append(m.IsList ? "LocalizedList" : "LocalizedText");
-                    sb.Append(' ');
-                    sb.Append(Sanitize(m.Name));
-                    sb.AppendLine(" { get; }");
-                }
-
                 sb.AppendLine();
                 sb.Append("        internal ");
                 sb.Append(typeName);
                 sb.AppendLine("(global::LocalizationRuntime.LocalizationTable t)");
                 sb.AppendLine("        {");
+                sb.AppendLine("            _t = t;");
+                sb.AppendLine("        }");
+                sb.AppendLine();
+                sb.AppendLine("        private readonly global::LocalizationRuntime.LocalizationTable _t;");
+                sb.AppendLine();
 
+                // 惰性创建：只有真正被读到的键才分配响应单元，
+                // 启动成本与"用到的键数"成正比，而不是与"总键数"成正比。
                 foreach (var m in members)
                 {
-                    sb.Append("            ");
-                    sb.Append(Sanitize(m.Name));
-                    sb.Append(" = new global::LocalizationRuntime.");
-                    sb.Append(m.IsList ? "LocalizedList(t, " : "LocalizedText(t, ");
-                    sb.Append(keysClass);
-                    sb.Append('.');
-                    sb.Append(Sanitize(m.FirstPath));
-
-                    if (m.IsList)
-                    {
-                        sb.Append(", ");
-                        sb.Append(m.Length.ToString(CultureInfo.InvariantCulture));
-                    }
-
-                    sb.AppendLine(");");
+                    EmitLazyMember(sb, m, keysClass, "_t", "        ");
                 }
 
-                sb.AppendLine("        }");
                 sb.AppendLine("    }");
                 sb.AppendLine();
             }
@@ -588,12 +588,7 @@ namespace LocalizationRuntime.Generator
             // 根级键：直接作为门面类的属性
             foreach (var m in rootMembers)
             {
-                sb.Append("    public global::LocalizationRuntime.");
-                sb.Append(m.IsList ? "LocalizedList" : "LocalizedText");
-                sb.Append(' ');
-                sb.Append(Sanitize(m.Name));
-                sb.AppendLine(" { get; }");
-                sb.AppendLine();
+                EmitLazyMember(sb, m, keysClass, "Table", "    ");
             }
 
             sb.Append("    public ");
@@ -601,25 +596,6 @@ namespace LocalizationRuntime.Generator
             sb.AppendLine("(global::LocalizationRuntime.LocalizationTable table)");
             sb.AppendLine("    {");
             sb.AppendLine("        Table = table;");
-
-            foreach (var m in rootMembers)
-            {
-                sb.Append("        ");
-                sb.Append(Sanitize(m.Name));
-                sb.Append(" = new global::LocalizationRuntime.");
-                sb.Append(m.IsList ? "LocalizedList(table, " : "LocalizedText(table, ");
-                sb.Append(keysClass);
-                sb.Append('.');
-                sb.Append(Sanitize(m.FirstPath));
-
-                if (m.IsList)
-                {
-                    sb.Append(", ");
-                    sb.Append(m.Length.ToString(CultureInfo.InvariantCulture));
-                }
-
-                sb.AppendLine(");");
-            }
 
             foreach (var group in order)
             {
@@ -651,6 +627,78 @@ namespace LocalizationRuntime.Generator
             sb.AppendLine("}");
         }
 
+        /// <summary>
+        /// 生成一个惰性成员：字段初始为 null，首次读取时创建响应单元并注册到表。
+        /// 这样启动成本只与"实际用到的键"成正比；一旦创建就常驻，后续读取只是一次字段读。
+        /// </summary>
+        private static void EmitLazyMember(
+            StringBuilder sb,
+            MemberInfo member,
+            string keysClass,
+            string tableField,
+            string indent)
+        {
+            var name = Sanitize(member.Name);
+            var type = member.IsList ? "LocalizedList" : "LocalizedText";
+
+            sb.Append(indent);
+            sb.Append("private global::LocalizationRuntime.");
+            sb.Append(type);
+            sb.Append("? _");
+            sb.Append(name);
+            sb.AppendLine(";");
+            sb.AppendLine();
+
+            sb.Append(indent);
+            sb.Append("public global::LocalizationRuntime.");
+            sb.Append(type);
+            sb.Append(' ');
+            sb.Append(name);
+            sb.AppendLine();
+            sb.Append(indent);
+            sb.AppendLine("{");
+            sb.Append(indent);
+            sb.AppendLine("    get");
+            sb.Append(indent);
+            sb.AppendLine("    {");
+            sb.Append(indent);
+            sb.Append("        var v = _");
+            sb.Append(name);
+            sb.AppendLine(";");
+            sb.Append(indent);
+            sb.Append("        if (v != null) return v;");
+            sb.AppendLine();
+            sb.Append(indent);
+            sb.AppendLine();
+            sb.Append(indent);
+            sb.Append("        v = new global::LocalizationRuntime.");
+            sb.Append(type);
+            sb.Append('(');
+            sb.Append(tableField);
+            sb.Append(", ");
+            sb.Append(keysClass);
+            sb.Append('.');
+            sb.Append(Sanitize(member.FirstPath));
+            if (member.IsList)
+            {
+                sb.Append(", ");
+                sb.Append(member.Length.ToString(CultureInfo.InvariantCulture));
+            }
+
+            sb.AppendLine(");");
+            sb.Append(indent);
+            sb.Append("        _");
+            sb.Append(name);
+            sb.AppendLine(" = v;");
+            sb.Append(indent);
+            sb.AppendLine("        return v;");
+            sb.Append(indent);
+            sb.AppendLine("    }");
+            sb.Append(indent);
+            sb.AppendLine("}");
+            sb.AppendLine();
+        }
+
         private sealed class MemberInfo
         {
             public MemberInfo(string name, string firstPath, bool isList, int length)
@@ -660,7 +708,6 @@ namespace LocalizationRuntime.Generator
                 IsList = isList;
                 Length = length;
             }
-
             public string Name { get; }
 
             public string FirstPath { get; }
@@ -922,4 +969,5 @@ namespace LocalizationRuntime.Generator
         public List<ResourceFlattener.Entry> Entries { get; }
     }
 }
+
 
