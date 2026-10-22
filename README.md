@@ -109,12 +109,77 @@ ja-JP → ja → 基语言
 dotnet_diagnostic.LR1006.severity = error
 ```
 
+## 可配置的 MSBuild 属性
+
+| 属性 | 默认值 | 说明 |
+|---|---|---|
+| `LocalizationDirectory` | `Localization` | 资源目录，可写多级（`Resources\I18n`） |
+| `LocalizationDefaultCulture` | `zh-CN` | 基语言：定义键集合，也是回退目标 |
+| `LocalizationClassName` | `L` | 生成的门面类名 |
+| `LocalizationNamespaceSuffix` | `.Localization` | 命名空间后缀，最终为 `RootNamespace` + 后缀 |
+| `EnableLocalizationRuntimeAutoIncludes` | `true` | 设为 `false` 可关闭自动挂载，手写 `AdditionalFiles` |
+
+三种覆盖方式都有效，优先级由低到高：
+
+```xml
+<!-- ① Directory.Build.props（全仓库） -->
+<LocalizationDirectory>Resources\I18n</LocalizationDirectory>
+```
+```xml
+<!-- ② csproj 内 -->
+<PropertyGroup>
+  <LocalizationDefaultCulture>en-US</LocalizationDefaultCulture>
+</PropertyGroup>
+```
+```bash
+# ③ 命令行
+dotnet build -p:LocalizationClassName=Strings
+```
+
+默认值与挂载逻辑故意分开放：默认值在包内 `build/*.props`（csproj 之前求值），
+`AdditionalFiles` 在 `build/*.targets`（csproj 之后求值）。否则用户覆盖的目录名在求值时还没生效。
+
+## 性能
+
+1220 键 × 3 语言，Release，`benchmarks/LocalizationRuntime.Benchmarks`：
+
+| 操作 | 耗时 | 分配 |
+|---|---|---|
+| `Get(id)` 命中 | 1.18 ns | 0 B |
+| `Get(string)` 命中 | 10.20 ns | 0 B |
+| `LocalizedList.Value` 命中缓存 | 3.74 ns | 0 B |
+| `Format(1 参数)` | 68.50 ns | 88 B |
+| `SetCulture` | 2.65 µs | — |
+
+几个关键点：
+
+- `Get(id)` 是一次快照引用读加一次数组索引，热路径无锁、无字典哈希、零分配。
+- `LocalizedList` 的缓存以不可变对象整体替换，命中时不加锁；未命中才在锁内重建。
+- 通知列表以不可变数组发布，切语言时不复制单元集合。
+- 模板不含 `{` 时跳过 `string.Format`，`Format` 的单参数重载避免 `params` 数组分配。
+
+## 测试
+
+```bash
+# 用 xunit 执行器直接跑，不依赖 VSTest
+dotnet run --project tests/LocalizationRuntime.Tests.Runner
+
+# 标准方式（需要 testhost 能正常运行）
+dotnet test tests/LocalizationRuntime.Tests
+```
+
+覆盖运行时语义（回退链、幂等切换、订阅者异常隔离、缓存引用稳定性）与并发
+（多线程切语言、切换期间读值一致性）。
+
 ## 项目结构
 
 ```
-src/LocalizationRuntime/            运行时（netstandard2.0 + net8.0）
-src/LocalizationRuntime.Generator/  Roslyn 增量生成器
-samples/LocalizationRuntime.Sample/ 三种语言的示例
+src/LocalizationRuntime/               运行时（netstandard2.0 + net8.0）
+src/LocalizationRuntime.Generator/     Roslyn 增量生成器 + 包内 build/ 目标
+samples/LocalizationRuntime.Sample/    三种语言的示例
+tests/LocalizationRuntime.Tests/       xunit 测试
+tests/LocalizationRuntime.Tests.Runner/ 不依赖 VSTest 的测试执行器
+benchmarks/LocalizationRuntime.Benchmarks/ 1220 键规模的热路径基准
 ```
 
 ## 尚未实现

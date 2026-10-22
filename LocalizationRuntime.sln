@@ -26,6 +26,29 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Localization", "Localizatio
 		samples\LocalizationRuntime.Sample\Localization\zh-CN.json = samples\LocalizationRuntime.Sample\Localization\zh-CN.json
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "LocalizationRuntime.Tests", "LocalizationRuntime.Tests", "{03759012-6763-308C-3775-0AA59AF1CC92}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalizationRuntime.Tests", "tests\LocalizationRuntime.Tests\LocalizationRuntime.Tests.csproj", "{45E370B1-667D-4C07-A16D-7D3967BB64E5}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "LocalizationRuntime.Tests.Runner", "LocalizationRuntime.Tests.Runner", "{8A47C3A5-F596-D8D9-DFAE-C5128DD35997}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalizationRuntime.Tests.Runner", "tests\LocalizationRuntime.Tests.Runner\LocalizationRuntime.Tests.Runner.csproj", "{DB082E6C-3EF6-4B4E-8688-F6444D9EDD2D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "benchmarks", "benchmarks", "{66320409-64EC-F7C5-3DEF-65E7510DAAD1}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "LocalizationRuntime.Benchmarks", "LocalizationRuntime.Benchmarks", "{C7C73D3E-3301-4049-3ACB-E047F8BEA371}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LocalizationRuntime.Benchmarks", "benchmarks\LocalizationRuntime.Benchmarks\LocalizationRuntime.Benchmarks.csproj", "{F234A615-CC57-42BB-A2AC-31301044E7C8}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Localization", "Localization", "{6F2D8C15-9A34-4E71-B8C2-3E7A5D901F63}"
+	ProjectSection(SolutionItems) = preProject
+		benchmarks\LocalizationRuntime.Benchmarks\Localization\en-US.json = benchmarks\LocalizationRuntime.Benchmarks\Localization\en-US.json
+		benchmarks\LocalizationRuntime.Benchmarks\Localization\ja-JP.json = benchmarks\LocalizationRuntime.Benchmarks\Localization\ja-JP.json
+		benchmarks\LocalizationRuntime.Benchmarks\Localization\zh-CN.json = benchmarks\LocalizationRuntime.Benchmarks\Localization\zh-CN.json
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -72,6 +95,42 @@ Global
 		{5AC046AD-AF2E-4212-9166-7B84295DEA08}.Release|x64.Build.0 = Release|Any CPU
 		{5AC046AD-AF2E-4212-9166-7B84295DEA08}.Release|x86.ActiveCfg = Release|Any CPU
 		{5AC046AD-AF2E-4212-9166-7B84295DEA08}.Release|x86.Build.0 = Release|Any CPU
+		{45E370B1-667D-4C07-A16D-7D3967BB64E5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{45E370B1-667D-4C07-A16D-7D3967BB64E5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{45E370B1-667D-4C07-A16D-7D3967BB64E5}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{45E370B1-667D-4C07-A16D-7D3967BB64E5}.Debug|x64.Build.0 = Debug|Any CPU
+		{45E370B1-667D-4C07-A16D-7D3967BB64E5}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{45E370B1-667D-4C07-A16D-7D3967BB64E5}.Debug|x86.Build.0 = Debug|Any CPU
+		{45E370B1-667D-4C07-A16D-7D3967BB64E5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{45E370B1-667D-4C07-A16D-7D3967BB64E5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{45E370B1-667D-4C07-A16D-7D3967BB64E5}.Release|x64.ActiveCfg = Release|Any CPU
+		{45E370B1-667D-4C07-A16D-7D3967BB64E5}.Release|x64.Build.0 = Release|Any CPU
+		{45E370B1-667D-4C07-A16D-7D3967BB64E5}.Release|x86.ActiveCfg = Release|Any CPU
+		{45E370B1-667D-4C07-A16D-7D3967BB64E5}.Release|x86.Build.0 = Release|Any CPU
+		{DB082E6C-3EF6-4B4E-8688-F6444D9EDD2D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DB082E6C-3EF6-4B4E-8688-F6444D9EDD2D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DB082E6C-3EF6-4B4E-8688-F6444D9EDD2D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{DB082E6C-3EF6-4B4E-8688-F6444D9EDD2D}.Debug|x64.Build.0 = Debug|Any CPU
+		{DB082E6C-3EF6-4B4E-8688-F6444D9EDD2D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{DB082E6C-3EF6-4B4E-8688-F6444D9EDD2D}.Debug|x86.Build.0 = Debug|Any CPU
+		{DB082E6C-3EF6-4B4E-8688-F6444D9EDD2D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DB082E6C-3EF6-4B4E-8688-F6444D9EDD2D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DB082E6C-3EF6-4B4E-8688-F6444D9EDD2D}.Release|x64.ActiveCfg = Release|Any CPU
+		{DB082E6C-3EF6-4B4E-8688-F6444D9EDD2D}.Release|x64.Build.0 = Release|Any CPU
+		{DB082E6C-3EF6-4B4E-8688-F6444D9EDD2D}.Release|x86.ActiveCfg = Release|Any CPU
+		{DB082E6C-3EF6-4B4E-8688-F6444D9EDD2D}.Release|x86.Build.0 = Release|Any CPU
+		{F234A615-CC57-42BB-A2AC-31301044E7C8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F234A615-CC57-42BB-A2AC-31301044E7C8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F234A615-CC57-42BB-A2AC-31301044E7C8}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F234A615-CC57-42BB-A2AC-31301044E7C8}.Debug|x64.Build.0 = Debug|Any CPU
+		{F234A615-CC57-42BB-A2AC-31301044E7C8}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F234A615-CC57-42BB-A2AC-31301044E7C8}.Debug|x86.Build.0 = Debug|Any CPU
+		{F234A615-CC57-42BB-A2AC-31301044E7C8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F234A615-CC57-42BB-A2AC-31301044E7C8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F234A615-CC57-42BB-A2AC-31301044E7C8}.Release|x64.ActiveCfg = Release|Any CPU
+		{F234A615-CC57-42BB-A2AC-31301044E7C8}.Release|x64.Build.0 = Release|Any CPU
+		{F234A615-CC57-42BB-A2AC-31301044E7C8}.Release|x86.ActiveCfg = Release|Any CPU
+		{F234A615-CC57-42BB-A2AC-31301044E7C8}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -84,5 +143,12 @@ Global
 		{7CD3B9FC-B854-829E-CF33-F721E325ABB7} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 		{5AC046AD-AF2E-4212-9166-7B84295DEA08} = {7CD3B9FC-B854-829E-CF33-F721E325ABB7}
 		{1B9E4A21-6C3F-4D77-9A05-2F5E8C7D31A4} = {7CD3B9FC-B854-829E-CF33-F721E325ABB7}
+		{03759012-6763-308C-3775-0AA59AF1CC92} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{45E370B1-667D-4C07-A16D-7D3967BB64E5} = {03759012-6763-308C-3775-0AA59AF1CC92}
+		{8A47C3A5-F596-D8D9-DFAE-C5128DD35997} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{DB082E6C-3EF6-4B4E-8688-F6444D9EDD2D} = {8A47C3A5-F596-D8D9-DFAE-C5128DD35997}
+		{C7C73D3E-3301-4049-3ACB-E047F8BEA371} = {66320409-64EC-F7C5-3DEF-65E7510DAAD1}
+		{F234A615-CC57-42BB-A2AC-31301044E7C8} = {C7C73D3E-3301-4049-3ACB-E047F8BEA371}
+		{6F2D8C15-9A34-4E71-B8C2-3E7A5D901F63} = {C7C73D3E-3301-4049-3ACB-E047F8BEA371}
 	EndGlobalSection
 EndGlobal

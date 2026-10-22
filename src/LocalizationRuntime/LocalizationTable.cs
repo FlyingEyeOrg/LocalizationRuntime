@@ -30,10 +30,15 @@ namespace LocalizationRuntime
         private readonly IReadOnlyList<string> _keys;
         private readonly Dictionary<string, int> _index;
         private readonly HashSet<string> _supported;
-        private readonly HashSet<LocalizedTextBase> _units = new HashSet<LocalizedTextBase>();
         private readonly Dictionary<string, string[]> _resolved = new Dictionary<string, string[]>(StringComparer.Ordinal);
         private readonly object _gate = new object();
         private readonly object _unitsGate = new object();
+
+        /// <summary>
+        /// 注册进表的响应单元。整体以不可变数组发布，读路径只需一次引用读；
+        /// 追加时复制并在锁内发布新数组，避免"旧数组 + 新长度"的撕裂。
+        /// </summary>
+        private LocalizedTextBase[] _units = new LocalizedTextBase[0];
 
         private Snapshot _snapshot;
         private int _nextRevision;
@@ -128,6 +133,14 @@ namespace LocalizationRuntime
         /// <summary>按当前语言格式化。缺键或模板损坏时返回原文，不抛异常。</summary>
         public string Format(int id, params object?[] args)
         {
+            return args == null || args.Length == 0
+                ? Get(id)
+                : FormatCore(id, args);
+        }
+
+        /// <summary>单参数重载：避免 <c>params</c> 数组分配。</summary>
+        public string Format(int id, object? arg0)
+        {
             var snapshot = Volatile.Read(ref _snapshot);
             if ((uint)id >= (uint)snapshot.Values.Length)
             {
@@ -135,7 +148,33 @@ namespace LocalizationRuntime
             }
 
             var template = snapshot.Values[id];
-            if (args == null || args.Length == 0)
+
+            // 没有占位符时跳过 string.Format：绝大多数文案属于这一类
+            if (template.IndexOf('{') < 0)
+            {
+                return template;
+            }
+
+            try
+            {
+                return string.Format(snapshot.Culture, template, arg0);
+            }
+            catch (FormatException)
+            {
+                return template;
+            }
+        }
+
+        private string FormatCore(int id, object?[] args)
+        {
+            var snapshot = Volatile.Read(ref _snapshot);
+            if ((uint)id >= (uint)snapshot.Values.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(id), id, "键 id 超出范围。");
+            }
+
+            var template = snapshot.Values[id];
+            if (template.IndexOf('{') < 0)
             {
                 return template;
             }
@@ -183,11 +222,12 @@ namespace LocalizationRuntime
             }
 
             // 状态已提交。以下全部是"提交后动作"：任何异常都不能让调用方以为切换失败。
-            foreach (var unit in SnapshotUnits())
+            var units = Volatile.Read(ref _units);
+            for (var i = 0; i < units.Length; i++)
             {
                 try
                 {
-                    unit.RaiseChanged();
+                    units[i].RaiseChanged();
                 }
                 catch (Exception)
                 {
@@ -234,6 +274,12 @@ namespace LocalizationRuntime
             return result;
         }
 
+        /// <summary>列表重建时用的锁。与 <see cref="_gate"/> 分开，避免与切语言互相阻塞。</summary>
+        internal object UnitLock
+        {
+            get { return _unitsGate; }
+        }
+
         internal void Register(LocalizedTextBase unit)
         {
             if (unit == null)
@@ -243,17 +289,11 @@ namespace LocalizationRuntime
 
             lock (_unitsGate)
             {
-                _units.Add(unit);
-            }
-        }
-
-        private LocalizedTextBase[] SnapshotUnits()
-        {
-            lock (_unitsGate)
-            {
-                var result = new LocalizedTextBase[_units.Count];
-                _units.CopyTo(result);
-                return result;
+                var current = _units;
+                var next = new LocalizedTextBase[current.Length + 1];
+                Array.Copy(current, next, current.Length);
+                next[current.Length] = unit;
+                Volatile.Write(ref _units, next);
             }
         }
 
@@ -293,17 +333,38 @@ namespace LocalizationRuntime
 
         private string[] BuildResolved(string cultureName)
         {
-            var chain = BuildChain(cultureName);
             var length = _keys.Count;
+
+            // 基语言本身：补齐空槽即可，无需逐键走链
+            if (string.Equals(cultureName, _catalog.DefaultCultureName, StringComparison.OrdinalIgnoreCase))
+            {
+                return Materialize(_catalog.GetTable(cultureName), length);
+            }
+
+            var chain = BuildChain(cultureName);
+
+            // 链上只有一层（常见于二级 culture，如 ja-JP 直接命中）
+            if (chain.Count == 1)
+            {
+                return Materialize(_catalog.GetTable(chain[0]), length);
+            }
+
+            // 预先取表，避免在内层循环里反复 switch 查表
+            var tables = new string?[chain.Count][];
+            for (var i = 0; i < chain.Count; i++)
+            {
+                tables[i] = _catalog.GetTable(chain[i])!;
+            }
+
             var result = new string[length];
 
             for (var id = 0; id < length; id++)
             {
                 var value = (string?)null;
 
-                for (var level = 0; level < chain.Count; level++)
+                for (var level = 0; level < tables.Length; level++)
                 {
-                    var table = _catalog.GetTable(chain[level]);
+                    var table = tables[level];
                     if (table != null && id < table.Length && table[id] != null)
                     {
                         value = table[id];
@@ -312,6 +373,35 @@ namespace LocalizationRuntime
                 }
 
                 result[id] = value ?? _keys[id];
+            }
+
+            return result;
+        }
+
+        /// <summary>把一张可能含 null 的原始表补成不含 null 的数组。</summary>
+        private string[] Materialize(string?[]? source, int length)
+        {
+            var result = new string[length];
+
+            if (source == null)
+            {
+                for (var i = 0; i < length; i++)
+                {
+                    result[i] = _keys[i];
+                }
+
+                return result;
+            }
+
+            var copy = Math.Min(length, source.Length);
+            for (var i = 0; i < copy; i++)
+            {
+                result[i] = source[i] ?? _keys[i];
+            }
+
+            for (var i = copy; i < length; i++)
+            {
+                result[i] = _keys[i];
             }
 
             return result;

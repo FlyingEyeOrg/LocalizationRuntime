@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Threading;
 
 namespace LocalizationRuntime
 {
@@ -37,6 +38,18 @@ namespace LocalizationRuntime
             get { return _table.Get(_id); }
         }
 
+        /// <summary>按当前语言格式化。模板损坏时返回原文，不抛异常。</summary>
+        public string Format(params object?[] args)
+        {
+            return _table.Format(_id, args);
+        }
+
+        /// <summary>单参数重载：避免 <c>params</c> 数组分配。</summary>
+        public string Format(object? arg0)
+        {
+            return _table.Format(_id, arg0);
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         internal override void RaiseChanged()
@@ -61,13 +74,27 @@ namespace LocalizationRuntime
     /// </summary>
     public sealed class LocalizedList : LocalizedTextBase, INotifyPropertyChanged
     {
+        private sealed class Cache
+        {
+            internal Cache(int revision, string[] items)
+            {
+                Revision = revision;
+                Items = items;
+            }
+
+            internal readonly int Revision;
+            internal readonly string[] Items;
+        }
+
         private readonly LocalizationTable _table;
         private readonly int _baseId;
         private readonly int _length;
-        private readonly object _sync = new object();
 
-        private string[]? _cached;
-        private int _cachedRevision = -1;
+        /// <summary>
+        /// 缓存用一个不可变对象整体替换，读路径因此无需加锁：
+        /// 命中时只做一次引用比较，未命中才在锁内重建。
+        /// </summary>
+        private Cache? _cache;
 
         public LocalizedList(LocalizationTable table, int baseId, int length)
         {
@@ -87,13 +114,26 @@ namespace LocalizationRuntime
             get
             {
                 var revision = _table.Revision;
+                var cache = Volatile.Read(ref _cache);
 
-                lock (_sync)
+                if (cache != null && cache.Revision == revision)
                 {
-                    if (revision == _cachedRevision && _cached != null)
-                    {
-                        return _cached;
-                    }
+                    return cache.Items;
+                }
+
+                return Rebuild(revision);
+            }
+        }
+
+        private string[] Rebuild(int revision)
+        {
+            lock (_table.UnitLock)
+            {
+                // 双重检查：并发读时可能有别的线程刚建好
+                var cache = Volatile.Read(ref _cache);
+                if (cache != null && cache.Revision == _table.Revision)
+                {
+                    return cache.Items;
                 }
 
                 var items = new string[_length];
@@ -102,12 +142,8 @@ namespace LocalizationRuntime
                     items[i] = _table.Get(_baseId + i);
                 }
 
-                lock (_sync)
-                {
-                    _cached = items;
-                    _cachedRevision = revision;
-                    return _cached;
-                }
+                Volatile.Write(ref _cache, new Cache(_table.Revision, items));
+                return items;
             }
         }
 

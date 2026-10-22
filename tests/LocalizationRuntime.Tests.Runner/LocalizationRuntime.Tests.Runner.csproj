@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    测试运行器。不依赖 VSTest（在受限环境里 testhost 无法启动），
+    直接用 xunit 的执行器跑，任何能跑 dotnet run 的机器都能用。
+    用法：dotnet run -project tests/LocalizationRuntime.Tests.Runner
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>LocalizationRuntime.Tests.Runner</RootNamespace>
+    <AssemblyName>LocalizationRuntime.Tests.Runner</AssemblyName>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.utility" Version="2.9.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LocalizationRuntime.Tests\LocalizationRuntime.Tests.csproj" />
+  </ItemGroup>
+
+</Project>
