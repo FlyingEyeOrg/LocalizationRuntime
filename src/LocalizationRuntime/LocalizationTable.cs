@@ -6,9 +6,14 @@ using System.Threading;
 namespace LocalizationRuntime
 {
     /// <summary>
-    /// 运行期状态。唯一可变的是 <see cref="_snapshot"/> 这一个引用：
-    /// 表、culture、版本号一起换，读者只会看到完整的旧值或完整的新值，不会读到撕裂的中间态。
-    /// 切语言无 IO，因此是同步的。
+    /// 运行期状态：持有当前语言，按 key 取值。
+    ///
+    /// 两件事：用 <see cref="Get(int)"/> / <see cref="Get(string)"/> 取当前语言的值，
+    /// 用 <see cref="SetCulture(CultureInfo)"/> 切换语言。切换后再次取值自然得到新语言的值。
+    ///
+    /// 唯一可变的是 <see cref="_snapshot"/> 这一个引用：表、culture、版本号一起换，
+    /// 读者只会看到完整的旧值或完整的新值，不会读到撕裂的中间态。
+    /// 切换无 IO，因此是同步的。
     /// </summary>
     public sealed class LocalizationTable
     {
@@ -27,18 +32,10 @@ namespace LocalizationRuntime
         }
 
         private readonly ILocalizationCatalog _catalog;
-        private readonly IReadOnlyList<string> _keys;
         private readonly Dictionary<string, int> _index;
         private readonly HashSet<string> _supported;
         private readonly Dictionary<string, string[]> _resolved = new Dictionary<string, string[]>(StringComparer.Ordinal);
         private readonly object _gate = new object();
-        private readonly object _unitsGate = new object();
-
-        /// <summary>
-        /// 注册进表的响应单元。整体以不可变数组发布，读路径只需一次引用读；
-        /// 追加时复制并在锁内发布新数组，避免"旧数组 + 新长度"的撕裂。
-        /// </summary>
-        private LocalizedTextBase[] _units = new LocalizedTextBase[0];
 
         private Snapshot _snapshot;
         private int _nextRevision;
@@ -51,12 +48,12 @@ namespace LocalizationRuntime
         public LocalizationTable(ILocalizationCatalog catalog, CultureInfo? initialCulture)
         {
             _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
-            _keys = catalog.Keys;
 
-            _index = new Dictionary<string, int>(_keys.Count, StringComparer.Ordinal);
-            for (var i = 0; i < _keys.Count; i++)
+            var keys = catalog.Keys;
+            _index = new Dictionary<string, int>(keys.Count, StringComparer.Ordinal);
+            for (var i = 0; i < keys.Count; i++)
             {
-                _index[_keys[i]] = i;
+                _index[keys[i]] = i;
             }
 
             _supported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -70,62 +67,37 @@ namespace LocalizationRuntime
             _nextRevision = 1;
         }
 
-        /// <summary>当前快照版本号。每成功切换一次语言递增一次。</summary>
-        public int Revision
-        {
-            get { return Volatile.Read(ref _snapshot).Revision; }
-        }
-
+        /// <summary>当前语言。</summary>
         public CultureInfo CurrentCulture
         {
             get { return Volatile.Read(ref _snapshot).Culture; }
         }
 
-        public IReadOnlyList<string> Keys
+        /// <summary>当前快照版本号，每成功切换一次语言递增一次。</summary>
+        public int Revision
         {
-            get { return _keys; }
-        }
-
-        /// <summary>已注册的响应单元数量。诊断用。</summary>
-        public int ResponseUnitCount
-        {
-            get { return Volatile.Read(ref _units).Length; }
-        }
-
-        public bool IsSupported(string cultureName)
-        {
-            return !string.IsNullOrEmpty(cultureName) && _supported.Contains(cultureName);
+            get { return Volatile.Read(ref _snapshot).Revision; }
         }
 
         /// <summary>
-        /// 按编译期键 id 取值。热路径：一次快照读 + 一次数组索引，零分配、无分支、无锁。
-        /// 缺键在编译期已由诊断拦下；运行期若仍未命中，返回键路径本身。
+        /// 按编译期键 id 取值。热路径：一次快照读 + 一次数组索引，零分配、无锁。
+        /// 这是生成器产出的访问器所走的路。
         /// </summary>
         public string Get(int id)
         {
-            var snapshot = Volatile.Read(ref _snapshot);
-            if ((uint)id >= (uint)snapshot.Values.Length)
+            var values = Volatile.Read(ref _snapshot).Values;
+            if ((uint)id >= (uint)values.Length)
             {
                 throw new ArgumentOutOfRangeException(nameof(id), id, "键 id 超出范围。");
             }
 
-            return snapshot.Values[id];
+            return values[id];
         }
 
-        /// <summary>按点分键取值，供 XAML 绑定等拿不到编译期 id 的场景使用。</summary>
-        public bool TryGet(string key, out string? value)
-        {
-            int id;
-            if (key != null && _index.TryGetValue(key, out id))
-            {
-                value = Get(id);
-                return true;
-            }
-
-            value = null;
-            return false;
-        }
-
+        /// <summary>
+        /// 按点分键取值（如 <c>"App.Title"</c>），供拿不到编译期 id 的场景使用。
+        /// 键不存在时返回键本身。
+        /// </summary>
         public string Get(string key)
         {
             if (key == null)
@@ -133,71 +105,13 @@ namespace LocalizationRuntime
                 throw new ArgumentNullException(nameof(key));
             }
 
-            return _index.TryGetValue(key, out var id) ? Get(id) : key;
-        }
-
-        /// <summary>按当前语言格式化。缺键或模板损坏时返回原文，不抛异常。</summary>
-        public string Format(int id, params object?[] args)
-        {
-            return args == null || args.Length == 0
-                ? Get(id)
-                : FormatCore(id, args);
-        }
-
-        /// <summary>单参数重载：避免 <c>params</c> 数组分配。</summary>
-        public string Format(int id, object? arg0)
-        {
-            var snapshot = Volatile.Read(ref _snapshot);
-            if ((uint)id >= (uint)snapshot.Values.Length)
-            {
-                throw new ArgumentOutOfRangeException(nameof(id), id, "键 id 超出范围。");
-            }
-
-            var template = snapshot.Values[id];
-
-            // 没有占位符时跳过 string.Format：绝大多数文案属于这一类
-            if (template.IndexOf('{') < 0)
-            {
-                return template;
-            }
-
-            try
-            {
-                return string.Format(snapshot.Culture, template, arg0);
-            }
-            catch (FormatException)
-            {
-                return template;
-            }
-        }
-
-        private string FormatCore(int id, object?[] args)
-        {
-            var snapshot = Volatile.Read(ref _snapshot);
-            if ((uint)id >= (uint)snapshot.Values.Length)
-            {
-                throw new ArgumentOutOfRangeException(nameof(id), id, "键 id 超出范围。");
-            }
-
-            var template = snapshot.Values[id];
-            if (template.IndexOf('{') < 0)
-            {
-                return template;
-            }
-
-            try
-            {
-                return string.Format(snapshot.Culture, template, args);
-            }
-            catch (FormatException)
-            {
-                return template;
-            }
+            int id;
+            return _index.TryGetValue(key, out id) ? Get(id) : key;
         }
 
         /// <summary>
         /// 切换语言。无 IO，同步完成；返回是否真的发生了切换。
-        /// 状态提交之后才通知，且单个订阅者抛异常不影响其余订阅者。
+        /// 切换后再次取值即得到新语言的值。
         /// </summary>
         public bool SetCulture(CultureInfo culture)
         {
@@ -205,10 +119,6 @@ namespace LocalizationRuntime
             {
                 throw new ArgumentNullException(nameof(culture));
             }
-
-            CultureInfo previous;
-            CultureInfo current;
-            int revision;
 
             lock (_gate)
             {
@@ -218,88 +128,13 @@ namespace LocalizationRuntime
                     return false;
                 }
 
-                previous = snapshot.Culture;
-                current = culture.Name.Length == 0
+                var current = culture.Name.Length == 0
                     ? CultureInfo.GetCultureInfo(_catalog.DefaultCultureName)
                     : culture;
 
-                revision = _nextRevision++;
+                var revision = _nextRevision++;
                 Volatile.Write(ref _snapshot, new Snapshot(Resolve(current.Name), current, revision));
-            }
-
-            // 状态已提交。以下全部是"提交后动作"：任何异常都不能让调用方以为切换失败。
-            var units = Volatile.Read(ref _units);
-            for (var i = 0; i < units.Length; i++)
-            {
-                try
-                {
-                    units[i].RaiseChanged();
-                }
-                catch (Exception)
-                {
-                    // 单个订阅者出错不影响其余订阅者，也不影响已经生效的语言。
-                }
-            }
-
-            var handler = CultureChanged;
-            if (handler != null)
-            {
-                var args = new CultureChangedEventArgs(previous, current, revision);
-                foreach (EventHandler<CultureChangedEventArgs> target in handler.GetInvocationList())
-                {
-                    try
-                    {
-                        target(this, args);
-                    }
-                    catch (Exception)
-                    {
-                        // 同上：逐个隔离。
-                    }
-                }
-            }
-
-            return true;
-        }
-
-        /// <summary>
-        /// 语言已切换。文本本身通过各访问器的 PropertyChanged 通知；
-        /// 这个事件用于文本之外需要跟随语言变化的东西（流向、排序、日期格式等）。
-        /// </summary>
-        public event EventHandler<CultureChangedEventArgs>? CultureChanged;
-
-        /// <summary>当前语言的 键 → 值 快照，供导出或诊断使用。</summary>
-        public IReadOnlyDictionary<string, string> ExportCurrent()
-        {
-            var snapshot = Volatile.Read(ref _snapshot);
-            var result = new Dictionary<string, string>(snapshot.Values.Length, StringComparer.Ordinal);
-            for (var i = 0; i < snapshot.Values.Length; i++)
-            {
-                result[_keys[i]] = snapshot.Values[i];
-            }
-
-            return result;
-        }
-
-        /// <summary>列表重建时用的锁。与 <see cref="_gate"/> 分开，避免与切语言互相阻塞。</summary>
-        internal object UnitLock
-        {
-            get { return _unitsGate; }
-        }
-
-        internal void Register(LocalizedTextBase unit)
-        {
-            if (unit == null)
-            {
-                return;
-            }
-
-            lock (_unitsGate)
-            {
-                var current = _units;
-                var next = new LocalizedTextBase[current.Length + 1];
-                Array.Copy(current, next, current.Length);
-                next[current.Length] = unit;
-                Volatile.Write(ref _units, next);
+                return true;
             }
         }
 
@@ -339,7 +174,8 @@ namespace LocalizationRuntime
 
         private string[] BuildResolved(string cultureName)
         {
-            var length = _keys.Count;
+            var keys = _catalog.Keys;
+            var length = keys.Count;
 
             // 基语言本身：补齐空槽即可，无需逐键走链
             if (string.Equals(cultureName, _catalog.DefaultCultureName, StringComparison.OrdinalIgnoreCase))
@@ -355,7 +191,7 @@ namespace LocalizationRuntime
                 return Materialize(_catalog.GetTable(chain[0]), length);
             }
 
-            // 预先取表，避免在内层循环里反复 switch 查表
+            // 预先取表，避免在内层循环里反复查表
             var tables = new string?[chain.Count][];
             for (var i = 0; i < chain.Count; i++)
             {
@@ -378,7 +214,7 @@ namespace LocalizationRuntime
                     }
                 }
 
-                result[id] = value ?? _keys[id];
+                result[id] = value ?? keys[id];
             }
 
             return result;
@@ -388,12 +224,13 @@ namespace LocalizationRuntime
         private string[] Materialize(string?[]? source, int length)
         {
             var result = new string[length];
+            var keys = _catalog.Keys;
 
             if (source == null)
             {
                 for (var i = 0; i < length; i++)
                 {
-                    result[i] = _keys[i];
+                    result[i] = keys[i];
                 }
 
                 return result;
@@ -402,12 +239,12 @@ namespace LocalizationRuntime
             var copy = Math.Min(length, source.Length);
             for (var i = 0; i < copy; i++)
             {
-                result[i] = source[i] ?? _keys[i];
+                result[i] = source[i] ?? keys[i];
             }
 
             for (var i = copy; i < length; i++)
             {
-                result[i] = _keys[i];
+                result[i] = keys[i];
             }
 
             return result;

@@ -1,5 +1,4 @@
 using System;
-using System.ComponentModel;
 using System.Globalization;
 using LocalizationRuntime;
 using LocalizationRuntime.Sample.Localization;
@@ -10,7 +9,7 @@ namespace LocalizationRuntime.Sample
     {
         private static int Main()
         {
-            // 1) 生成器已把三种语言编译进程序集；构造表时按系统 culture 自动选语言。
+            // 生成器已把三种语言编译进程序集；构造表时按系统 culture 自动选语言。
             var table = new LocalizationTable(L.Catalog);
             var l = new L(table);
 
@@ -20,47 +19,27 @@ namespace LocalizationRuntime.Sample
 
             Dump(table, l, "初次加载");
 
-            // 2) 运行时切换，无需重启、无需读文件
+            // 运行时切换，无需重启、无需读文件
             table.SetCulture(CultureInfo.GetCultureInfo("en-US"));
             Dump(table, l, "切到 en-US");
 
             table.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
             Dump(table, l, "切到 ja-JP（Common.Cancel 未翻译，应回退到 zh-CN）");
 
-            // 3) 响应式：绑定到 Value 的对象在切语言时收到通知
-            var notifications = 0;
-            PropertyChangedEventHandler handler = (_, e) =>
-            {
-                if (e.PropertyName == nameof(LocalizedText.Value))
-                {
-                    notifications++;
-                }
-            };
-
-            l.App.Title.PropertyChanged += handler;
-
+            // 同一个访问器实例，切语言后再读就是新值
+            var title = l.App.Title;
             table.SetCulture(CultureInfo.GetCultureInfo("zh-CN"));
-            l.App.Title.PropertyChanged -= handler;
 
-            Console.WriteLine();
-            Console.WriteLine("切回 zh-CN 后 App.Title 收到 PropertyChanged 次数: " + notifications);
-            Console.WriteLine("列表引用是否在未切语言时保持不变: " + ReferenceEquals(l.MainWindow.Tabs.Value, l.MainWindow.Tabs.Value));
+            Console.WriteLine("同一个 LocalizedText 实例切语言后重读: " + title.Value);
+            Console.WriteLine("列表引用是否在未切语言时保持不变: " +
+                              ReferenceEquals(l.MainWindow.Tabs.Value, l.MainWindow.Tabs.Value));
             Console.WriteLine();
 
-            // 4) 文本之外的东西跟随语言变化
-            var cultureEvents = 0;
-            table.CultureChanged += (_, e) =>
-            {
-                cultureEvents++;
-                Console.WriteLine("  [CultureChanged] " + e.OldCulture.Name + " → " + e.NewCulture.Name +
-                                  " (rev " + e.Revision + ")");
-            };
-
-            table.SetCulture(CultureInfo.GetCultureInfo("en-US"));
-            table.SetCulture(CultureInfo.GetCultureInfo("en-US"));   // 幂等，不应触发
-            Console.WriteLine("CultureChanged 触发次数（第二次同语言应被忽略）: " + cultureEvents);
-            Console.WriteLine();
-            Console.WriteLine("当前 App.Title.Value = " + l.App.Title.Value);
+            // 幂等：同语言不递增版本号
+            var revisionBefore = table.Revision;
+            var changed = table.SetCulture(CultureInfo.GetCultureInfo("zh-CN"));
+            Console.WriteLine("重复切同一语言: 返回 " + changed + "，版本号 " +
+                              revisionBefore + " → " + table.Revision);
 
             return 0;
         }

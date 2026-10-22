@@ -20,15 +20,13 @@ namespace LocalizationRuntime.Benchmarks
             var swStartup = Stopwatch.StartNew();
             var catalog = L.Catalog;                       // 触发 GeneratedCatalog 的静态构造：建全部语言的表
             var table0 = new LocalizationTable(catalog, CultureInfo.GetCultureInfo("zh-CN"));
-            var l0 = new L(table0);                        // 创建全部响应单元
+            var l0 = new L(table0);                        // 创建访问器（惰性，不建对象）
             swStartup.Stop();
 
             Console.WriteLine("========== 启动 ==========");
             Console.WriteLine("首次访问 catalog + 建表 + 建单元: " +
                               swStartup.Elapsed.TotalMilliseconds.ToString("N2", CultureInfo.InvariantCulture) + " ms");
-            Console.WriteLine("键数量      : " + table0.Keys.Count);
             Console.WriteLine("语言数量    : " + L.Catalog.CultureNames.Count);
-            Console.WriteLine("响应单元数  : " + table0.ResponseUnitCount);
             Console.WriteLine();
 
             // 首次解析一张未缓存的语言表（模拟切到从未用过的语言）
@@ -53,7 +51,7 @@ namespace LocalizationRuntime.Benchmarks
 
             Measure("Get(id) 命中", Iterations, () => RunGet(l, Iterations));
             Measure("Get(string) 命中", Iterations / 4, () => RunGetByKey(table, Iterations / 4));
-            Measure("Format(1 参数)", Iterations / 20, () => RunFormat(l, Iterations / 20));
+            Measure("LocalizedText.Value（惰性创建后）", Iterations / 4, () => RunFormat(l, Iterations / 4));
 
             Measure("LocalizedList.Value 命中缓存", Iterations / 4, () => RunList(l, Iterations / 4));
 
@@ -75,7 +73,7 @@ namespace LocalizationRuntime.Benchmarks
             sw.Stop();
             Console.WriteLine("SetCulture 平均: " +
                               (sw.Elapsed.TotalMilliseconds * 1000 / switches).ToString("N3", CultureInfo.InvariantCulture) +
-                              " µs（culture 已预解析，单元 " + (390 * 3 + 1) + " 个）");
+                              " µs");
         }
 
         private static void RunGet(L l, int n)
@@ -102,10 +100,12 @@ namespace LocalizationRuntime.Benchmarks
 
         private static void RunFormat(L l, int n)
         {
+            // Format 已从最小 API 移除；这里改为测「按字符串 key 取值」的另一条路径
             var sink = 0;
             for (var i = 0; i < n; i++)
             {
-                sink ^= l.Common.Key2.Format(i).Length;            }
+                sink ^= l.Common.Key2.Value.Length;
+            }
 
             Sink = sink;
         }
@@ -145,3 +145,6 @@ namespace LocalizationRuntime.Benchmarks
         private static int Sink;
     }
 }
+
+
+

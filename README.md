@@ -11,6 +11,17 @@ table.SetCulture(CultureInfo.GetCultureInfo("en-US"));
 l.App.Title.Value;                              // "Tool Retraction Control"
 ```
 
+核心只有两件事：**按 key 取当前语言的值**，**设置当前语言**。
+
+```csharp
+table.Get(LKeys.App_Title);                     // 编译期 id，最快
+table.Get("App.Title");                         // 字符串 key
+table.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
+```
+
+没有通知、没有订阅、没有弱引用。切语言后再次取值自然就是新语言的值——
+谁需要刷新界面，谁负责在切语言后重新读取。
+
 ## 两条设计决定
 
 **一、值在编译期固化，运行期只做选择。**
@@ -67,18 +78,22 @@ internal sealed class L                 // 强类型访问器
 `LocalizedList` 缓存引用是有意的：绑到 `TabControl.ItemsSource` 时，切语言不重建控件，
 `SelectedIndex` 和滚动位置都不会丢。
 
-## 响应式
+## 切语言后如何刷新界面
 
-两类访问器都实现 `INotifyPropertyChanged`，切语言时由表统一唤醒。
-它们由生成器做成**容器单例**，全局只有一份，因此不需要弱引用，也不存在忘记清理导致泄漏的问题。
+库不提供通知机制。切语言后，再次读取就是新值——刷新由调用方决定：
 
 ```csharp
-public MainViewModel(L l)
-{
-    _l = l;
-    _l.App.Title.PropertyChanged += (_, _) => OnPropertyChanged(nameof(Title));
-}
+// 控制台 / 服务：直接再读一次
+table.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
+Console.WriteLine(l.App.Title.Value);
+
+// WPF：切语言后自行触发一次重读，例如重新查询 VM 的属性
+table.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
+viewModel.RefreshLocalizedText();
 ```
+
+这样做的原因：通知机制要么强制表持有响应对象（会导致泄漏，需要弱引用和压缩逻辑），
+要么强制每处绑定手写订阅。把刷新时机交给调用方，核心保持无状态、无登记、无生命周期管理。
 
 ## 回退
 
@@ -145,34 +160,24 @@ dotnet build -p:LocalizationClassName=Strings
 
 | 操作 | 耗时 | 分配 |
 |---|---|---|
-| `Get(id)` 命中 | 1.7 ns | 0 B |
-| `Get(string)` 命中 | 11.2 ns | 0 B |
-| `LocalizedList.Value` 命中缓存 | 3.8 ns | 0 B |
-| `Format(1 参数)` | 70 ns | 103 B |
-| `SetCulture`（已缓存） | 0.19 µs | — |
+| `Get(id)` 命中 | 1.5 ns | 0 B |
+| `Get(string)` 命中 | 11.3 ns | 0 B |
+| `LocalizedText.Value` | 1.6 ns | 0 B |
+| `LocalizedList.Value` 命中缓存 | 9.1 ns | 0 B |
+| `SetCulture`（已缓存） | 0.09 µs | — |
 | 首次切到未缓存语言（含建表） | 3.1 ms | — |
-| **启动**（访问 catalog + 建表 + 建单元） | **8.9 ms** | — |
+| **启动**（访问 catalog + 建表 + 建访问器） | **9.0 ms** | — |
 
 几个关键点：
 
 - `Get(id)` 是一次快照引用读加一次数组索引，热路径无锁、无字典哈希、零分配。
-- **响应单元惰性创建**：只有真正被读取的键才分配 `LocalizedText`/`LocalizedList`，
+- **访问器惰性创建**：只有真正被读取的键才分配 `LocalizedText`/`LocalizedList`，
   启动成本与「用到的键数」成正比，而不是与「总键数」成正比。
 - **语言表惰性填充**：只有被请求的语言才建数组，启动时只付当前语言的代价。
 - `LocalizedList` 的缓存以不可变对象整体替换，命中时不加锁；未命中才在锁内重建。
-- 通知列表以不可变数组发布，切语言时不复制单元集合。
-- 模板不含 `{` 时跳过 `string.Format`，单参数重载避免 `params` 数组分配。
+- `SetCulture` 只做一次快照替换，不遍历、不分配。
 
-惰性化前后的启动对比（同规模）：
-
-| | 优化前 | 优化后 |
-|---|---|---|
-| 启动 | 21.2 ms | **8.9 ms** |
-| 启动时创建的响应单元 | 1171 | **0** |
-| 首次切到某语言 | 0.71 ms | 3.1 ms |
-
-代价是首次切换到某语言要建表。对客户端这是正确取舍：启动只发生一次且用户能感知，
-切语言通常发生在设置页，几毫秒无感。
+去掉通知机制后 `SetCulture` 从 0.19 µs 降到 0.09 µs——因为不再需要遍历单元列表。
 
 ## 测试
 

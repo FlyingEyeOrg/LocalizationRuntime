@@ -58,12 +58,29 @@ namespace LocalizationRuntime.Tests
         }
 
         [Fact]
-        public void Get_ReturnsValueForRequestedCulture()
+        public void GetById_ReturnsValueForRequestedCulture()
         {
             var table = new LocalizationTable(CreateCatalog(), CultureInfo.GetCultureInfo("en-US"));
 
             Assert.Equal("Hello", table.Get(0));
             Assert.Equal("One", table.Get(1));
+        }
+
+        [Fact]
+        public void GetByKey_ReturnsSameValueAsById()
+        {
+            var table = new LocalizationTable(CreateCatalog(), CultureInfo.GetCultureInfo("en-US"));
+
+            Assert.Equal(table.Get(0), table.Get("Hello"));
+            Assert.Equal("Two", table.Get("Tabs.1"));
+        }
+
+        [Fact]
+        public void GetByKey_UnknownKey_ReturnsKeyItself()
+        {
+            var table = new LocalizationTable(CreateCatalog(), CultureInfo.GetCultureInfo("en-US"));
+
+            Assert.Equal("No.Such.Key", table.Get("No.Such.Key"));
         }
 
         [Fact]
@@ -88,7 +105,15 @@ namespace LocalizationRuntime.Tests
         }
 
         [Fact]
-        public void SetCulture_SameCulture_ReturnsFalse()
+        public void Get_OutOfRangeId_Throws()
+        {
+            var table = new LocalizationTable(CreateCatalog(), CultureInfo.GetCultureInfo("en-US"));
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => table.Get(999));
+        }
+
+        [Fact]
+        public void SetCulture_SameCulture_ReturnsFalseAndKeepsRevision()
         {
             var table = new LocalizationTable(CreateCatalog(), CultureInfo.GetCultureInfo("en-US"));
 
@@ -97,54 +122,39 @@ namespace LocalizationRuntime.Tests
         }
 
         [Fact]
-        public void SetCulture_Switch_IncrementsRevisionAndRaisesEvent()
+        public void SetCulture_Switch_IncrementsRevision()
         {
             var table = new LocalizationTable(CreateCatalog(), CultureInfo.GetCultureInfo("en-US"));
-            CultureChangedEventArgs? captured = null;
-            table.CultureChanged += (_, e) => captured = e;
 
             Assert.True(table.SetCulture(CultureInfo.GetCultureInfo("ja-JP")));
 
             Assert.Equal(1, table.Revision);
             Assert.Equal("ja-JP", table.CurrentCulture.Name);
-            Assert.NotNull(captured);
-            Assert.Equal("en-US", captured!.OldCulture.Name);
-            Assert.Equal("ja-JP", captured.NewCulture.Name);
         }
 
         [Fact]
-        public void SetCulture_SubscriberThrows_DoesNotBreakOtherSubscribers()
+        public void SetCulture_ThenGet_ReturnsNewLanguageValue()
         {
             var table = new LocalizationTable(CreateCatalog(), CultureInfo.GetCultureInfo("en-US"));
-            var reached = 0;
 
-            table.CultureChanged += (_, _) => throw new InvalidOperationException("boom");
-            table.CultureChanged += (_, _) => reached++;
+            Assert.Equal("Hello", table.Get("Hello"));
 
-            // 不应抛出，且语言必须已生效
-            Assert.True(table.SetCulture(CultureInfo.GetCultureInfo("ja-JP")));
-            Assert.Equal(1, reached);
-            Assert.Equal("ja-JP", table.CurrentCulture.Name);
+            table.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
+
+            Assert.Equal("こんにちは", table.Get("Hello"));
         }
 
         [Fact]
-        public void LocalizedText_RaisesPropertyChanged_OnCultureChange()
+        public void LocalizedText_TracksCulture_WithoutSubscription()
         {
             var table = new LocalizationTable(CreateCatalog(), CultureInfo.GetCultureInfo("en-US"));
             var text = new LocalizedText(table, 0);
 
-            var count = 0;
-            text.PropertyChanged += (_, e) =>
-            {
-                if (e.PropertyName == nameof(LocalizedText.Value))
-                {
-                    count++;
-                }
-            };
+            Assert.Equal("Hello", text.Value);
 
             table.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
 
-            Assert.Equal(1, count);
+            // 不需要任何通知：再读一次就是新语言的值
             Assert.Equal("こんにちは", text.Value);
         }
 
@@ -157,7 +167,7 @@ namespace LocalizationRuntime.Tests
             var first = list.Value;
             var second = list.Value;
 
-            // 未切语言：必须是同一个实例，否则绑定会丢选中项
+            // 未切语言：必须是同一个实例，避免重复分配
             Assert.Same(first, second);
             Assert.Equal("One", first[0]);
 
@@ -171,28 +181,19 @@ namespace LocalizationRuntime.Tests
         }
 
         [Fact]
-        public void Format_UsesCurrentCulture()
+        public void LocalizedList_Indexer_ReadsThroughCurrentSnapshot()
         {
             var table = new LocalizationTable(CreateCatalog(), CultureInfo.GetCultureInfo("en-US"));
+            var list = new LocalizedList(table, 1, 2);
 
-            Assert.Equal("Body 42", table.Format(4, 42));
-        }
+            Assert.Equal("One", list[0]);
+            Assert.Equal("Two", list[1]);
 
-        [Fact]
-        public void Format_NoPlaceholder_SkipsFormatting()
-        {
-            var table = new LocalizationTable(CreateCatalog(), CultureInfo.GetCultureInfo("en-US"));
+            table.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
 
-            // 模板没有占位符时，多余参数不应导致 FormatException
-            Assert.Equal("Hello", table.Format(0, "ignored"));
-        }
-
-        [Fact]
-        public void Get_OutOfRangeId_Throws()
-        {
-            var table = new LocalizationTable(CreateCatalog(), CultureInfo.GetCultureInfo("en-US"));
-
-            Assert.Throws<ArgumentOutOfRangeException>(() => table.Get(999));
+            Assert.Equal("一", list[0]);
+            // Tabs.1 回退基语言
+            Assert.Equal("二", list[1]);
         }
 
         [Fact]
@@ -214,7 +215,6 @@ namespace LocalizationRuntime.Tests
                 try
                 {
                     table.SetCulture(cultures[i % 3]);
-                    // 读到的值必须自洽：任何一个键都必须是合法字符串
                     if (table.Get(0) == null)
                     {
                         System.Threading.Interlocked.Increment(ref errors);
@@ -234,11 +234,6 @@ namespace LocalizationRuntime.Tests
         public void Concurrent_ReadWhileSwitching_SeesConsistentSnapshot()
         {
             var table = new LocalizationTable(CreateCatalog(), CultureInfo.GetCultureInfo("en-US"));
-            var cultures = new[]
-            {
-                CultureInfo.GetCultureInfo("en-US"),
-                CultureInfo.GetCultureInfo("ja-JP")
-            };
 
             var mismatches = 0;
 
