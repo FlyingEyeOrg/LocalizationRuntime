@@ -32,8 +32,11 @@
     <CompilerVisibleProperty Include="LocalizationNamespaceSuffix" />
   </ItemGroup>
 
-  <!-- 引用了生成器包的项目自动把资源目录挂到编译输入上。 -->
-  <ItemGroup Condition="'$(EnableDefaultLocalizationItems)' != 'false'">
+  <!--
+    项目目录下存在资源目录时才挂到编译输入上；没有该目录的项目完全不受影响。
+    生成器只能看到 AdditionalFiles 里的文件，这是整条链路的入口。
+  -->
+  <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)\$(LocalizationDirectory)')">
     <AdditionalFiles Include="$(MSBuildProjectDirectory)\$(LocalizationDirectory)\*.json" />
   </ItemGroup>
 

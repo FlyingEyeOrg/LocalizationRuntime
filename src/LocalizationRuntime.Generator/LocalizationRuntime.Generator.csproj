@@ -7,7 +7,6 @@
     <IsRoslynComponent>true</IsRoslynComponent>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <IncludeBuildOutput>false</IncludeBuildOutput>
-    <EnableDefaultLocalizationItems>false</EnableDefaultLocalizationItems>
     <!-- 分析器不能打 Nullable 元数据以外的花样，保持最保守。 -->
     <DebugType>embedded</DebugType>
   </PropertyGroup>
