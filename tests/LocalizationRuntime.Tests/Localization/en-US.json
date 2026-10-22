@@ -1,0 +1,13 @@
+{
+  "Scalar": "scalar",
+  "Group": {
+    "A": "1",
+    "Deep": { "B": "2", "C": { "D": "3" } }
+  },
+  "StrArr": [ "a", "b", "c" ],
+  "OneStrArr": [ "only" ],
+  "ObjArr": [ { "K": "v" }, { "K": "w" } ],
+  "ArrArr": [ [ "a", "b" ], [ "c" ] ],
+  "ObjArrArr": [ [ { "V": "1" }, { "V": "2" } ], [ { "V": "3" } ] ],
+  "ArrObj": [ { "Sub": [ "x", "y" ] }, { "Sub": [ "z" ] } ]
+}

@@ -6,6 +6,7 @@
     <AssemblyName>LocalizationRuntime.Tests</AssemblyName>
     <IsPackable>false</IsPackable>
     <Nullable>enable</Nullable>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,7 +14,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- 测试用的资源集：覆盖标量、嵌套对象、字符串数组、对象数组、嵌套数组 -->
+    <AdditionalFiles Include="$(MSBuildProjectDirectory)\Localization\*.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\LocalizationRuntime\LocalizationRuntime.csproj" />
+    <ProjectReference Include="..\..\src\LocalizationRuntime.Generator\LocalizationRuntime.Generator.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>

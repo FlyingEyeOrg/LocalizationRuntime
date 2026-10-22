@@ -313,41 +313,74 @@ namespace LocalizationRuntime.Generator
             sb.AppendLine(";");
             sb.AppendLine();
             sb.AppendLine("/// <summary>编译期键 id。由生成器产出，不要手写。</summary>");
-            sb.AppendLine("internal static class TextIds");
+            sb.AppendLine("public static class LocalizationIds");
             sb.AppendLine("{");
 
-            // 按 JSON 层级递归建嵌套静态类：
-            //   MainWindow.UserInfo.UserName
-            // 变成
-            //   TextIds.MainWindow.UserInfo.UserName
-            var root = new KeyNode(null);
+            var root = new KeyNode(null, null);
+
+            // 先登记所有叶子，同时记录每片叶子的真实路径（用于数组元素命名）
             foreach (var key in model.Keys)
             {
                 root.Add(key.Path, key.Id);
             }
 
-            EmitKeyNodes(sb, root, "    ");
+            // 容器 id 从叶子总数开始，与叶子区间不重叠，
+            // 因此把容器 id 传给 Get 必然越界，天然挡住误用。
+            root.AssignContainerIds(model.Keys.Length);
+
+            EmitKeyNodes(sb, root, "    ", string.Empty);
 
             sb.AppendLine("}");
             return sb.ToString();
         }
 
-        /// <summary>键路径树：每个节点要么有子节点（生成嵌套类），要么是叶子（生成 const int）。</summary>
+        /// <summary>
+        /// 键路径树。
+        ///
+        ///   · 叶子（字符串）       → const int，值是真实数组下标
+        ///   · 普通对象             → static class，名字即键名
+        ///   · 数组                 → {名}Object 类 + 同名容器常量；类里形如 {名}{N} 的元素常量
+        ///   · 数组元素（对象/数组） → {累计前缀}Item{N}Object 类
+        ///
+        /// 数组节点的类名带 Object 后缀，是为了能和同名容器常量共存（否则 CS0102）。
+        /// </summary>
         private sealed class KeyNode
         {
-            internal KeyNode(string? name)
+            internal KeyNode(string? name, string? prefix)
             {
                 Name = name;
+                Prefix = prefix;
             }
 
             internal string? Name { get; }
 
-            /// <summary>叶子节点对应的键 id；非叶子为 null。</summary>
+            /// <summary>累计前缀，用于给数组元素命名，保证任意深度都不重名。</summary>
+            internal string? Prefix { get; }
+
+            /// <summary>
+            /// 生成类时使用的名字。普通对象与 Name 相同；
+            /// 数组元素用累计前缀（Data + Item0 → DataItem0），与成员常量名区分开。
+            /// </summary>
+            internal string ClassName
+            {
+                get { return _className ?? Name ?? string.Empty; }
+                set { _className = value; }
+            }
+
+            private string? _className;
+
+            /// <summary>叶子：真实数组下标。容器：结构 id（≥ 叶子总数）。普通对象：null。</summary>
             internal int? Id { get; set; }
+
+            /// <summary>本节点是否对应一个数组。</summary>
+            internal bool IsArray { get; set; }
+
+            /// <summary>本节点是否是数组里的一个元素。只有这类节点生成带 Object 后缀的类。</summary>
+            internal bool IsArrayElement { get; set; }
 
             internal List<KeyNode> Children { get; } = new List<KeyNode>();
 
-            internal KeyNode GetOrAddChild(string name)
+            internal KeyNode GetOrAddChild(string name, string prefix)
             {
                 for (var i = 0; i < Children.Count; i++)
                 {
@@ -357,7 +390,7 @@ namespace LocalizationRuntime.Generator
                     }
                 }
 
-                var child = new KeyNode(name);
+                var child = new KeyNode(name, prefix);
                 Children.Add(child);
                 return child;
             }
@@ -366,74 +399,228 @@ namespace LocalizationRuntime.Generator
             {
                 var segments = path.Split('.');
                 var node = this;
+                var prefix = string.Empty;
 
                 for (var i = 0; i < segments.Length; i++)
                 {
-                    var isLast = i == segments.Length - 1;
                     var segment = segments[i];
+                    var isLast = i == segments.Length - 1;
 
-                    // 数字段是数组下标，不能作标识符，统一映射成 Item{N}：
-                    //   Tabs.0          → Tabs.Item0
-                    //   Menus.0.Header  → Menus.Item0.Header
-                    //   Menus.0.Items.0 → Menus.Item0.Items.Item0
                     if (IsAllDigits(segment))
                     {
-                        var itemName = "Item" + segment;
+                        node.IsArray = true;
+
+                        // 数组元素一律带 Item 关键字：
+                        //   Menus.0      → MenusItem0        （前缀 = 数组名 Menus）
+                        //   Data.0.0     → DataItem0Item0    （嵌套时把上一层元素名并入）
+                        // 上层普通对象名不参与（否则会出现 MainWindowTabsItem0）。
+                        var className = prefix.Length == 0
+                            ? (node.Name ?? string.Empty) + "Item" + segment
+                            : prefix + "Item" + segment;
+                        var constantName = className;
+
                         if (isLast)
                         {
-                            node.GetOrAddChild(itemName).Id = id;
+                            // 字符串数组：元素本身就是叶子
+                            var leaf = node.GetOrAddChild(constantName, className);
+                            leaf.ClassName = className;
+                            leaf.IsArrayElement = true;
+                            leaf.Id = id;
                             return;
                         }
 
-                        node = node.GetOrAddChild(itemName);
+                        var child = node.GetOrAddChild(constantName, className);
+                        child.ClassName = className;
+                        child.IsArrayElement = true;
+                        node = child;
+                        prefix = className;
                         continue;
                     }
 
                     if (isLast)
                     {
-                        node.GetOrAddChild(segment).Id = id;
+                        node.GetOrAddChild(segment, prefix + segment).Id = id;
                         return;
                     }
 
-                    node = node.GetOrAddChild(segment);
+                    node = node.GetOrAddChild(segment, prefix + segment);
+
+                    // 进入普通对象后重置前缀：数组元素命名只认数组名与嵌套层，
+                    // 不继承 MainWindow 这类外层对象名。
+                    prefix = string.Empty;
                 }
+            }
+
+            /// <summary>
+            /// 深度优先给容器节点分配结构 id：
+            ///   Data=14 → DataItem0=15 → DataItem0Item0=16 → DataItem0Item1=17 → DataItem1=18 → ...
+            /// 每个元素先占 id，然后立刻展开它自己的子树，因此父级元素的兄弟编号会跳开。
+            /// </summary>
+            internal int AssignContainerIds(int next)
+            {
+                for (var i = 0; i < Children.Count; i++)
+                {
+                    var child = Children[i];
+
+                    // 叶子已有真实下标，不占容器 id
+                    if (child.Children.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    if (child.IsArray)
+                    {
+                        child.Id = next++;
+                    }
+
+                    // 元素逐个占 id，并立即展开其子树
+                    for (var j = 0; j < child.Children.Count; j++)
+                    {
+                        var element = child.Children[j];
+
+                        if (element.Children.Count > 0)
+                        {
+                            element.Id = next++;
+
+                            // 元素自身也是数组时，它的元素同样要占 id，
+                            // 这样编号顺序才是 DataItem0=15, DataItem0Item0=16, DataItem0Item1=17, DataItem1=18
+                            if (element.IsArray)
+                            {
+                                for (var k = 0; k < element.Children.Count; k++)
+                                {
+                                    var grand = element.Children[k];
+                                    if (grand.Children.Count > 0)
+                                    {
+                                        grand.Id = next++;
+                                    }
+                                }
+                            }
+
+                            next = element.AssignContainerIds(next);
+                        }
+                    }
+
+                    // 非数组的普通对象子树
+                    if (!child.IsArray)
+                    {
+                        next = child.AssignContainerIds(next);
+                    }
+                }
+
+                return next;
             }
         }
 
-        private static void EmitKeyNodes(StringBuilder sb, KeyNode node, string indent)
+        private static void EmitKeyNodes(StringBuilder sb, KeyNode node, string indent, string ownerName)
         {
-            // 叶子优先：有 id 就产出常量
-            if (node.Id.HasValue)
-            {
-                sb.Append(indent);
-                sb.Append("public const int ");
-                sb.Append(Sanitize(node.Name!));
-                sb.Append(" = ");
-                sb.Append(node.Id.Value.ToString(CultureInfo.InvariantCulture));
-                sb.AppendLine(";");
-            }
-
             foreach (var child in node.Children)
             {
-                // 子节点若是叶子且与父同名（不会发生），或只是纯叶子，都直接产出常量
+                var name = child.Name!;
+
+                // ── 叶子：一个具体字符串 ──
                 if (child.Children.Count == 0)
                 {
                     sb.Append(indent);
                     sb.Append("public const int ");
-                    sb.Append(Sanitize(child.Name!));
+                    sb.Append(name);
                     sb.Append(" = ");
                     sb.Append(child.Id.GetValueOrDefault().ToString(CultureInfo.InvariantCulture));
                     sb.AppendLine(";");
                     continue;
                 }
 
+                // ── 数组：容器常量 + {名}Object 类 ──
+                if (child.IsArray)
+                {
+                    sb.Append(indent);
+                    sb.Append("public const int ");
+                    sb.Append(name);
+                    sb.Append(" = ");
+                    sb.Append(child.Id.GetValueOrDefault().ToString(CultureInfo.InvariantCulture));
+                    sb.AppendLine(";");
+
+                    sb.Append(indent);
+                    sb.Append("public static class ");
+                    sb.Append(name);
+                    sb.AppendLine("Object");
+                    sb.Append(indent);
+                    sb.AppendLine("{");
+
+                    var inner = indent + "    ";
+
+                    foreach (var element in child.Children)
+                    {
+                        // 所有元素统一用累计前缀命名（带 Item 关键字）：
+                        //   MenusItem0 / DataItem0Item0
+                        // 类名再加 Object 后缀。
+                        var elementName = element.Name!;
+
+                        // 元素是纯字符串：直接产出常量
+                        if (element.Children.Count == 0)
+                        {
+                            sb.Append(inner);
+                            sb.Append("public const int ");
+                            sb.Append(elementName);
+                            sb.Append(" = ");
+                            sb.Append(element.Id.GetValueOrDefault().ToString(CultureInfo.InvariantCulture));
+                            sb.AppendLine(";");
+                            continue;
+                        }
+
+                        // 元素是对象或数组：常量 + {名}Object 类
+                        sb.Append(inner);
+                        sb.Append("public const int ");
+                        sb.Append(elementName);
+                        sb.Append(" = ");
+                        sb.Append(element.Id.GetValueOrDefault().ToString(CultureInfo.InvariantCulture));
+                        sb.AppendLine(";");
+
+                        var elementClass = element.ClassName + "Object";
+
+                        sb.Append(inner);
+                        sb.Append("public static class ");
+                        sb.Append(elementClass);
+                        sb.AppendLine();
+                        sb.Append(inner);
+                        sb.AppendLine("{");
+
+                        EmitKeyNodes(sb, element, inner + "    ", elementClass);
+                        sb.Append(inner);
+                        sb.AppendLine("}");
+                    }
+
+                    sb.Append(indent);
+                    sb.AppendLine("}");
+                    continue;
+                }
+
+                // ── 普通对象：static class ──
+                // 顶层普通对象用原名（App / Common）；只有数组元素内部的节点
+                // 才带 Object 后缀，与 {累计前缀}Item{N}Object 对应。
+                var objectClassName = child.IsArrayElement
+                    ? child.ClassName + "Object"
+                    : child.ClassName;
+
+                // 顶层非叶子节点（数组元素本身）先把 id 暴露成常量，
+                // 这样 DataItem0Object 里就有 DataItem0Item0 / DataItem0Item1。
+                if (child.Id.HasValue && child.IsArrayElement)
+                {
+                    sb.Append(indent);
+                    sb.Append("public const int ");
+                    sb.Append(Sanitize(child.Name!));
+                    sb.Append(" = ");
+                    sb.Append(child.Id.Value.ToString(CultureInfo.InvariantCulture));
+                    sb.AppendLine(";");
+                }
+
                 sb.Append(indent);
                 sb.Append("public static class ");
-                sb.Append(Sanitize(child.Name!));
+                sb.Append(objectClassName);
                 sb.AppendLine();
                 sb.Append(indent);
                 sb.AppendLine("{");
-                EmitKeyNodes(sb, child, indent + "    ");
+
+                EmitKeyNodes(sb, child, indent + "    ", objectClassName);
                 sb.Append(indent);
                 sb.AppendLine("}");
             }
@@ -451,6 +638,12 @@ namespace LocalizationRuntime.Generator
             sb.AppendLine(";");
             sb.AppendLine();
 
+            sb.AppendLine("public static class Catalog");
+            sb.AppendLine("{");
+            sb.AppendLine("    /// <summary>唯一的 catalog 实例。生成器已把全部语言编译进程序集。</summary>");
+            sb.AppendLine("    public static readonly global::LocalizationRuntime.ILocalizationCatalog Instance = new GeneratedCatalog();");
+            sb.AppendLine("}");
+            sb.AppendLine();
             sb.AppendLine("internal sealed class GeneratedCatalog : global::LocalizationRuntime.ILocalizationCatalog");
             sb.AppendLine("{");
             sb.AppendLine("    private static readonly string[] AllKeys =");
@@ -528,7 +721,6 @@ namespace LocalizationRuntime.Generator
             sb.AppendLine("}");
             sb.AppendLine();
 
-            EmitAccessors(sb, model);
             return sb.ToString();
         }
 
@@ -601,318 +793,6 @@ namespace LocalizationRuntime.Generator
                 sb.AppendLine("    }");
                 sb.AppendLine();
             }
-        }
-
-        private static void EmitAccessors(StringBuilder sb, ResourceModel model)
-        {
-            var keysClass = "TextIds";
-
-            sb.Append("internal sealed partial class ");
-            sb.Append(model.ClassName);
-            sb.AppendLine();
-            sb.AppendLine("{");
-
-            // 分组的依据是"首段后面是否还有命名段"：
-            //   App.Title      → 组 App，成员 Title
-            //   Tabs.0         → 根级数组，remainder 是纯数字，直接作为根成员 Tabs
-            //   App.Tabs.0     → 组 App，成员 Tabs（数组）
-            var rootKeys = new List<KeyDef>();
-            var groups = new Dictionary<string, List<KeyDef>>(StringComparer.Ordinal);
-            var order = new List<string>();
-
-            foreach (var key in model.Keys)
-            {
-                var dot = key.Path.IndexOf('.');
-                if (dot < 0)
-                {
-                    rootKeys.Add(key);
-                    continue;
-                }
-
-                var remainder = key.Path.Substring(dot + 1);
-                var remainderHead = remainder;
-                var innerDot = remainder.IndexOf('.');
-                if (innerDot >= 0)
-                {
-                    remainderHead = remainder.Substring(0, innerDot);
-                }
-
-                // 首段之后紧跟数字段，说明这是"以首段命名的数组"，属于根级成员
-                if (IsAllDigits(remainderHead))
-                {
-                    rootKeys.Add(key);
-                    continue;
-                }
-
-                var group = key.Path.Substring(0, dot);
-                List<KeyDef> list;
-                if (!groups.TryGetValue(group, out list))
-                {
-                    list = new List<KeyDef>();
-                    groups[group] = list;
-                    order.Add(group);
-                }
-
-                list.Add(key);
-            }
-
-            var rootMembers = DescribeMembers(rootKeys, false);
-            var membersByGroup = new Dictionary<string, List<MemberInfo>>(StringComparer.Ordinal);
-            foreach (var group in order)
-            {
-                membersByGroup[group] = DescribeMembers(groups[group], true);
-            }
-
-            // 分组：每组一个嵌套类型
-            foreach (var group in order)
-            {
-                var members = membersByGroup[group];
-                var typeName = GroupTypeName(group);
-
-                sb.Append("    public sealed class ");
-                sb.Append(typeName);
-                sb.AppendLine();
-                sb.AppendLine("    {");
-
-                sb.AppendLine();
-                sb.Append("        internal ");
-                sb.Append(typeName);
-                sb.AppendLine("(global::LocalizationRuntime.Localizer t)");
-                sb.AppendLine("        {");
-                sb.AppendLine("            _t = t;");
-                sb.AppendLine("        }");
-                sb.AppendLine();
-                sb.AppendLine("        private readonly global::LocalizationRuntime.Localizer _t;");
-                sb.AppendLine();
-
-                // 惰性创建：只有真正被读到的键才分配响应单元，
-                // 启动成本与"用到的键数"成正比，而不是与"总键数"成正比。
-                foreach (var m in members)
-                {
-                    EmitLazyMember(sb, m, keysClass, "_t", "        ");
-                }
-
-                sb.AppendLine("    }");
-                sb.AppendLine();
-            }
-
-            // 根级键：直接作为门面类的属性
-            foreach (var m in rootMembers)
-            {
-                EmitLazyMember(sb, m, keysClass, "Localizer", "    ");
-            }
-
-            sb.Append("    public ");
-            sb.Append(model.ClassName);
-            sb.AppendLine("(global::LocalizationRuntime.Localizer localizer)");
-            sb.AppendLine("    {");
-            sb.AppendLine("        Localizer = localizer;");
-
-            foreach (var group in order)
-            {
-                var name = Sanitize(GroupMemberName(group));
-                sb.Append("        ");
-                sb.Append(name);
-                sb.Append(" = new ");
-                sb.Append(GroupTypeName(group));
-                sb.AppendLine("(localizer);");
-            }
-
-            sb.AppendLine("    }");
-            sb.AppendLine();
-            sb.AppendLine("    public global::LocalizationRuntime.Localizer Localizer { get; }");
-            sb.AppendLine();
-
-            foreach (var group in order)
-            {
-                sb.Append("    public ");
-                sb.Append(GroupTypeName(group));
-                sb.Append(' ');
-                sb.Append(Sanitize(GroupMemberName(group)));
-                sb.AppendLine(" { get; }");
-                sb.AppendLine();
-            }
-
-            sb.Append("    public static global::LocalizationRuntime.ILocalizationCatalog Catalog { get; } = new GeneratedCatalog();");
-            sb.AppendLine();
-            sb.AppendLine("}");
-        }
-
-        /// <summary>
-        /// 生成一个惰性成员：字段初始为 null，首次读取时创建响应单元并注册到表。
-        /// 这样启动成本只与"实际用到的键"成正比；一旦创建就常驻，后续读取只是一次字段读。
-        /// </summary>
-        private static void EmitLazyMember(
-            StringBuilder sb,
-            MemberInfo member,
-            string keysClass,
-            string tableField,
-            string indent)
-        {
-            var name = Sanitize(member.Name);
-            var type = member.IsList ? "LocalizedList" : "LocalizedText";
-
-            sb.Append(indent);
-            sb.Append("private global::LocalizationRuntime.");
-            sb.Append(type);
-            sb.Append("? _");
-            sb.Append(name);
-            sb.AppendLine(";");
-            sb.AppendLine();
-
-            sb.Append(indent);
-            sb.Append("public global::LocalizationRuntime.");
-            sb.Append(type);
-            sb.Append(' ');
-            sb.Append(name);
-            sb.AppendLine();
-            sb.Append(indent);
-            sb.AppendLine("{");
-            sb.Append(indent);
-            sb.AppendLine("    get");
-            sb.Append(indent);
-            sb.AppendLine("    {");
-            sb.Append(indent);
-            sb.Append("        var v = _");
-            sb.Append(name);
-            sb.AppendLine(";");
-            sb.Append(indent);
-            sb.Append("        if (v != null) return v;");
-            sb.AppendLine();
-            sb.Append(indent);
-            sb.AppendLine();
-            sb.Append(indent);
-            sb.Append("        v = new global::LocalizationRuntime.");
-            sb.Append(type);
-            sb.Append('(');
-            sb.Append(tableField);
-            sb.Append(", ");
-            sb.Append(keysClass);
-            sb.Append('.');
-            sb.Append(KeyAccessPath(member.FirstPath));
-            if (member.IsList)
-            {
-                sb.Append(", ");
-                sb.Append(member.Length.ToString(CultureInfo.InvariantCulture));
-            }
-
-            sb.AppendLine(");");
-            sb.Append(indent);
-            sb.Append("        _");
-            sb.Append(name);
-            sb.AppendLine(" = v;");
-            sb.Append(indent);
-            sb.AppendLine("        return v;");
-            sb.Append(indent);
-            sb.AppendLine("    }");
-            sb.Append(indent);
-            sb.AppendLine("}");
-            sb.AppendLine();
-        }
-
-        private sealed class MemberInfo
-        {
-            public MemberInfo(string name, string firstPath, bool isList, int length)
-            {
-                Name = name;
-                FirstPath = firstPath;
-                IsList = isList;
-                Length = length;
-            }
-            public string Name { get; }
-
-            public string FirstPath { get; }
-
-            public bool IsList { get; }
-
-            public int Length { get; }
-        }
-
-        /// <summary>
-        /// 把一组已排序的键折叠成成员：连续的 .0 .1 .2 聚合成一个 LocalizedList，
-        /// 其余一对一映射成 LocalizedText。
-        /// </summary>
-        /// <param name="stripGroup">
-        /// true 表示这些键属于某个分组，成员名要去掉首段（App.Title → Title）；
-        /// false 表示是门面类的根级成员，名字保留完整路径（Tabs.0 → Tabs）。
-        /// </param>
-        private static List<MemberInfo> DescribeMembers(List<KeyDef> members, bool stripGroup)
-        {
-            var result = new List<MemberInfo>();
-            var i = 0;
-
-            while (i < members.Count)
-            {
-                var path = members[i].Path;
-                var dot = path.LastIndexOf('.');
-
-                if (dot >= 0 && string.Equals(path.Substring(dot + 1), "0", StringComparison.Ordinal))
-                {
-                    var prefix = path.Substring(0, dot);
-                    var count = 0;
-
-                    while (i + count < members.Count)
-                    {
-                        var candidate = members[i + count].Path;
-                        if (!candidate.StartsWith(prefix + ".", StringComparison.Ordinal))
-                        {
-                            break;
-                        }
-
-                        var segment = candidate.Substring(prefix.Length + 1);
-                        if (!IsAllDigits(segment))
-                        {
-                            break;
-                        }
-
-                        if (int.Parse(segment, CultureInfo.InvariantCulture) != count)
-                        {
-                            break;
-                        }
-
-                        count++;
-                    }
-
-                    if (count >= 2)
-                    {
-                        result.Add(new MemberInfo(NameOf(prefix, stripGroup), path, true, count));
-                        i += count;
-                        continue;
-                    }
-                }
-
-                result.Add(new MemberInfo(NameOf(path, stripGroup), path, false, 0));
-                i++;
-            }
-
-            return result;
-        }
-
-        private static string NameOf(string path, bool stripGroup)
-        {
-            if (!stripGroup)
-            {
-                return path;
-            }
-
-            return MemberName(path);
-        }
-
-        /// <summary>去掉首段，剩下的就是嵌套类内部的成员名。</summary>
-        private static string MemberName(string path)
-        {
-            var dot = path.IndexOf('.');
-            return dot < 0 ? path : path.Substring(dot + 1);
-        }
-
-        private static string GroupMemberName(string group)
-        {
-            return group.Length == 0 ? "Strings" : group;
-        }
-
-        private static string GroupTypeName(string group)
-        {
-            return Sanitize(GroupMemberName(group)) + "Strings";
         }
 
         private static bool IsAllDigits(string s)
@@ -1106,5 +986,34 @@ namespace LocalizationRuntime.Generator
         public List<ResourceFlattener.Entry> Entries { get; }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

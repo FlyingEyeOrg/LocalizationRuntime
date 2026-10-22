@@ -9,30 +9,26 @@ namespace LocalizationRuntime.Sample
     {
         private static int Main()
         {
-            // 生成器已把三种语言编译进程序集；构造表时按系统 culture 自动选语言。
-            var localizer = new Localizer(L.Catalog);
-            var l = new L(localizer);
+            // 生成器已把三种语言编译进程序集；构造 localizer 时按系统 culture 自动选语言。
+            var localizer = new Localizer(Catalog.Instance);
 
             Console.WriteLine("系统探测语言: " + localizer.CurrentCulture.Name);
-            Console.WriteLine("支持的语言  : " + string.Join(", ", L.Catalog.CultureNames));
+            Console.WriteLine("支持的语言  : " + string.Join(", ", Catalog.Instance.CultureNames));
             Console.WriteLine();
 
-            Dump(localizer, l, "初次加载");
+            Dump(localizer, "初次加载");
 
             // 运行时切换，无需重启、无需读文件
             localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
-            Dump(localizer, l, "切到 en-US");
+            Dump(localizer, "切到 en-US");
 
             localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
-            Dump(localizer, l, "切到 ja-JP（Common.Cancel 未翻译，应回退到 zh-CN）");
+            Dump(localizer, "切到 ja-JP（Common.Cancel 未翻译，应回退到 zh-CN）");
 
-            // 同一个访问器实例，切语言后再读就是新值
-            var title = l.App.Title;
+            // 切回中文：同一个 Localizer 实例，再读就是中文
             localizer.SetCulture(CultureInfo.GetCultureInfo("zh-CN"));
 
-            Console.WriteLine("同一个 LocalizedText 实例切语言后重读: " + title.Value);
-            Console.WriteLine("列表引用是否在未切语言时保持不变: " +
-                              ReferenceEquals(l.MainWindow.Tabs.Value, l.MainWindow.Tabs.Value));
+            Console.WriteLine("切回 zh-CN 后重读: " + localizer.Get(LocalizationIds.App.Title));
             Console.WriteLine();
 
             // 幂等：同语言不递增版本号
@@ -44,16 +40,46 @@ namespace LocalizationRuntime.Sample
             return 0;
         }
 
-        private static void Dump(Localizer localizer, L l, string title)
+        private static void Dump(Localizer localizer, string title)
         {
             Console.WriteLine("=== " + title + " ===");
             Console.WriteLine("culture      : " + localizer.CurrentCulture.Name);
-            Console.WriteLine("App.Title    : " + l.App.Title.Value);
-            Console.WriteLine("ConfirmDelete: " + string.Format(localizer.CurrentCulture, l.App.ConfirmDelete.Value, "刀具 A"));
-            Console.WriteLine("MainWindow   : " + l.MainWindow.Title.Value);
-            Console.WriteLine("Tabs[0..2]   : " + string.Join(" | ", l.MainWindow.Tabs[0], l.MainWindow.Tabs[1], l.MainWindow.Tabs[2]));
-            Console.WriteLine("Common.Cancel: " + l.Common.Cancel.Value);
+            Console.WriteLine("App.Title    : " + localizer.Get(LocalizationIds.App.Title));
+            Console.WriteLine("ConfirmDelete: " +
+                string.Format(localizer.CurrentCulture,
+                    localizer.Get(LocalizationIds.App.ConfirmDelete), "刀具 A"));
+            Console.WriteLine("MainWindow   : " + localizer.Get(LocalizationIds.MainWindow.Title));
+            Console.WriteLine("Common.Cancel: " + localizer.Get(LocalizationIds.Common.Cancel));
             Console.WriteLine();
+
+            Console.Write("Tabs         : ");
+            for (var i = 0; i < 3; i++)
+            {
+                if (i > 0)
+                {
+                    Console.Write(" | ");
+                }
+
+                Console.Write(localizer.Get(TabsId(i)));
+            }
+
+            Console.WriteLine();
+            Console.WriteLine();
+        }
+
+        /// <summary>
+        /// 字符串数组的元素 id 是编译期常量，逐个写死；这里用下标选，
+        /// 只是为了让示例能循环打印，实际代码直接写 LocalizationIds.MainWindow.TabsObject.TabsItem0。
+        /// </summary>
+        private static int TabsId(int index)
+        {
+            switch (index)
+            {
+                case 0: return LocalizationIds.MainWindow.TabsObject.TabsItem0;
+                case 1: return LocalizationIds.MainWindow.TabsObject.TabsItem1;
+                case 2: return LocalizationIds.MainWindow.TabsObject.TabsItem2;
+                default: throw new ArgumentOutOfRangeException(nameof(index));
+            }
         }
     }
 }

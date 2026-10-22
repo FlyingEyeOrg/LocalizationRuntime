@@ -18,45 +18,36 @@ namespace LocalizationRuntime.Benchmarks
         {
             // ---- 启动成本：客户端最敏感的一段 ----
             var swStartup = Stopwatch.StartNew();
-            var catalog = L.Catalog;                       // 触发 GeneratedCatalog 的静态构造：建全部语言的表
-            var localizer0 = new Localizer(catalog, CultureInfo.GetCultureInfo("zh-CN"));
-            var l0 = new L(localizer0);                        // 创建访问器（惰性，不建对象）
+            var catalog = Catalog.Instance;                // 触发 GeneratedCatalog 的静态构造
+            var localizer = new Localizer(catalog, CultureInfo.GetCultureInfo("zh-CN"));
             swStartup.Stop();
 
             Console.WriteLine("========== 启动 ==========");
-            Console.WriteLine("首次访问 catalog + 建表 + 建单元: " +
+            Console.WriteLine("首次访问 catalog + 建表: " +
                               swStartup.Elapsed.TotalMilliseconds.ToString("N2", CultureInfo.InvariantCulture) + " ms");
-            Console.WriteLine("语言数量    : " + L.Catalog.CultureNames.Count);
+            Console.WriteLine("语言数量    : " + catalog.CultureNames.Count);
+            Console.WriteLine("键数量      : " + catalog.Keys.Count);
             Console.WriteLine();
 
             // 首次解析一张未缓存的语言表（模拟切到从未用过的语言）
             var swFirstSwitch = Stopwatch.StartNew();
-            localizer0.SetCulture(CultureInfo.GetCultureInfo("en-US"));
+            localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
             swFirstSwitch.Stop();
             Console.WriteLine("首次切到未缓存语言: " +
                               swFirstSwitch.Elapsed.TotalMilliseconds.ToString("N3", CultureInfo.InvariantCulture) + " ms");
             Console.WriteLine();
             Console.WriteLine("========== 热路径 ==========");
-
-            var localizer = localizer0;
-            var l = l0;
-
             Console.WriteLine("迭代次数    : " + Iterations.ToString("N0", CultureInfo.InvariantCulture));
             Console.WriteLine();
 
             // 预热，避免把 JIT 时间算进去
-            RunGet(l, 1_000_000);
+            RunGetById(localizer, 1_000_000);
             RunGetByKey(localizer, 200_000);
-            RunFormat(l, 100_000);
 
-            Measure("Get(id) 命中", Iterations, () => RunGet(l, Iterations));
+            Measure("Get(id) 命中", Iterations, () => RunGetById(localizer, Iterations));
             Measure("Get(string) 命中", Iterations / 4, () => RunGetByKey(localizer, Iterations / 4));
-            Measure("LocalizedText.Value（惰性创建后）", Iterations / 4, () => RunFormat(l, Iterations / 4));
-
-            Measure("LocalizedList.Value 命中缓存", Iterations / 4, () => RunList(l, Iterations / 4));
 
             var switches = 200_000;
-            var names = new[] { "en-US", "ja-JP", "zh-CN" };
             var cultures = new[]
             {
                 CultureInfo.GetCultureInfo("en-US"),
@@ -76,46 +67,25 @@ namespace LocalizationRuntime.Benchmarks
                               " µs");
         }
 
-        private static void RunGet(L l, int n)
+        private static void RunGetById(Localizer localizer, int n)
         {
             var sink = 0;
+            var id = LocalizationIds.Common.Key0;
+
             for (var i = 0; i < n; i++)
             {
-                sink ^= l.Common.Key0.Value.Length;
+                sink ^= localizer.Get(id).Length;
             }
 
             Sink = sink;
         }
 
-        private static void RunGetByKey(Localizer t, int n)
+        private static void RunGetByKey(Localizer localizer, int n)
         {
             var sink = 0;
             for (var i = 0; i < n; i++)
             {
-                sink ^= t.Get("Common.Key1").Length;
-            }
-
-            Sink = sink;
-        }
-
-        private static void RunFormat(L l, int n)
-        {
-            // Format 已从最小 API 移除；这里改为测「按字符串 key 取值」的另一条路径
-            var sink = 0;
-            for (var i = 0; i < n; i++)
-            {
-                sink ^= l.Common.Key2.Value.Length;
-            }
-
-            Sink = sink;
-        }
-
-        private static void RunList(L l, int n)
-        {
-            var sink = 0;
-            for (var i = 0; i < n; i++)
-            {
-                sink ^= l.Menus.Items.Value.Count;
+                sink ^= localizer.Get("Common.Key1").Length;
             }
 
             Sink = sink;
@@ -145,6 +115,4 @@ namespace LocalizationRuntime.Benchmarks
         private static int Sink;
     }
 }
-
-
 
