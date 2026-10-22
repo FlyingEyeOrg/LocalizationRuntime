@@ -484,14 +484,39 @@ namespace LocalizationRuntime.Generator
             sb.AppendLine();
             sb.AppendLine("{");
 
+            // 分组的依据是"首段后面是否还有命名段"：
+            //   App.Title      → 组 App，成员 Title
+            //   Tabs.0         → 根级数组，remainder 是纯数字，直接作为根成员 Tabs
+            //   App.Tabs.0     → 组 App，成员 Tabs（数组）
+            var rootKeys = new List<KeyDef>();
             var groups = new Dictionary<string, List<KeyDef>>(StringComparer.Ordinal);
             var order = new List<string>();
 
             foreach (var key in model.Keys)
             {
                 var dot = key.Path.IndexOf('.');
-                var group = dot < 0 ? string.Empty : key.Path.Substring(0, dot);
+                if (dot < 0)
+                {
+                    rootKeys.Add(key);
+                    continue;
+                }
 
+                var remainder = key.Path.Substring(dot + 1);
+                var remainderHead = remainder;
+                var innerDot = remainder.IndexOf('.');
+                if (innerDot >= 0)
+                {
+                    remainderHead = remainder.Substring(0, innerDot);
+                }
+
+                // 首段之后紧跟数字段，说明这是"以首段命名的数组"，属于根级成员
+                if (IsAllDigits(remainderHead))
+                {
+                    rootKeys.Add(key);
+                    continue;
+                }
+
+                var group = key.Path.Substring(0, dot);
                 List<KeyDef> list;
                 if (!groups.TryGetValue(group, out list))
                 {
@@ -503,12 +528,14 @@ namespace LocalizationRuntime.Generator
                 list.Add(key);
             }
 
+            var rootMembers = DescribeMembers(rootKeys, false);
             var membersByGroup = new Dictionary<string, List<MemberInfo>>(StringComparer.Ordinal);
             foreach (var group in order)
             {
-                membersByGroup[group] = DescribeMembers(groups[group]);
+                membersByGroup[group] = DescribeMembers(groups[group], true);
             }
 
+            // 分组：每组一个嵌套类型
             foreach (var group in order)
             {
                 var members = membersByGroup[group];
@@ -558,11 +585,41 @@ namespace LocalizationRuntime.Generator
                 sb.AppendLine();
             }
 
+            // 根级键：直接作为门面类的属性
+            foreach (var m in rootMembers)
+            {
+                sb.Append("    public global::LocalizationRuntime.");
+                sb.Append(m.IsList ? "LocalizedList" : "LocalizedText");
+                sb.Append(' ');
+                sb.Append(Sanitize(m.Name));
+                sb.AppendLine(" { get; }");
+                sb.AppendLine();
+            }
+
             sb.Append("    public ");
             sb.Append(model.ClassName);
             sb.AppendLine("(global::LocalizationRuntime.LocalizationTable table)");
             sb.AppendLine("    {");
             sb.AppendLine("        Table = table;");
+
+            foreach (var m in rootMembers)
+            {
+                sb.Append("        ");
+                sb.Append(Sanitize(m.Name));
+                sb.Append(" = new global::LocalizationRuntime.");
+                sb.Append(m.IsList ? "LocalizedList(table, " : "LocalizedText(table, ");
+                sb.Append(keysClass);
+                sb.Append('.');
+                sb.Append(Sanitize(m.FirstPath));
+
+                if (m.IsList)
+                {
+                    sb.Append(", ");
+                    sb.Append(m.Length.ToString(CultureInfo.InvariantCulture));
+                }
+
+                sb.AppendLine(");");
+            }
 
             foreach (var group in order)
             {
@@ -617,7 +674,11 @@ namespace LocalizationRuntime.Generator
         /// 把一组已排序的键折叠成成员：连续的 .0 .1 .2 聚合成一个 LocalizedList，
         /// 其余一对一映射成 LocalizedText。
         /// </summary>
-        private static List<MemberInfo> DescribeMembers(List<KeyDef> members)
+        /// <param name="stripGroup">
+        /// true 表示这些键属于某个分组，成员名要去掉首段（App.Title → Title）；
+        /// false 表示是门面类的根级成员，名字保留完整路径（Tabs.0 → Tabs）。
+        /// </param>
+        private static List<MemberInfo> DescribeMembers(List<KeyDef> members, bool stripGroup)
         {
             var result = new List<MemberInfo>();
             var i = 0;
@@ -656,17 +717,27 @@ namespace LocalizationRuntime.Generator
 
                     if (count >= 2)
                     {
-                        result.Add(new MemberInfo(MemberName(prefix), path, true, count));
+                        result.Add(new MemberInfo(NameOf(prefix, stripGroup), path, true, count));
                         i += count;
                         continue;
                     }
                 }
 
-                result.Add(new MemberInfo(MemberName(path), path, false, 0));
+                result.Add(new MemberInfo(NameOf(path, stripGroup), path, false, 0));
                 i++;
             }
 
             return result;
+        }
+
+        private static string NameOf(string path, bool stripGroup)
+        {
+            if (!stripGroup)
+            {
+                return path;
+            }
+
+            return MemberName(path);
         }
 
         /// <summary>去掉首段，剩下的就是嵌套类内部的成员名。</summary>
@@ -851,3 +922,4 @@ namespace LocalizationRuntime.Generator
         public List<ResourceFlattener.Entry> Entries { get; }
     }
 }
+

@@ -7,6 +7,10 @@
     <IsRoslynComponent>true</IsRoslynComponent>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <IncludeBuildOutput>false</IncludeBuildOutput>
+    <PackageId>LocalizationRuntime.Generator</PackageId>
+    <Description>LocalizationRuntime 的 Roslyn 增量生成器：把 Localization/*.json 编译成常量数组。</Description>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <!-- 分析器不能打 Nullable 元数据以外的花样，保持最保守。 -->
     <DebugType>embedded</DebugType>
   </PropertyGroup>
@@ -21,6 +25,17 @@
           Pack="true"
           PackagePath="analyzers/dotnet/cs"
           Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      build/ 下的 props 与 targets 随包发布，NuGet 自动导入到仓库之外的使用方。
+      props 在 csproj 之前求值（只放默认值），targets 在其后求值（挂资源）。
+    -->
+    <None Include="build\**"
+          Pack="true"
+          PackagePath="build"
+          Visible="true" />
   </ItemGroup>
 
 </Project>

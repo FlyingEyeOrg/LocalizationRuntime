@@ -1,0 +1,19 @@
+<Project>
+
+  <!--
+    LocalizationRuntime.Generator 的资源挂载。
+    放在 targets 而不是 props，因为 targets 在 csproj 主体之后求值——
+    用户在 csproj 里改的 LocalizationDirectory 此时才可见。
+  -->
+
+  <PropertyGroup>
+    <_LocalizationResourceDir>$([MSBuild]::EnsureTrailingSlash('$(LocalizationDirectory)'))</_LocalizationResourceDir>
+    <_LocalizationResourceDirAbs>$(MSBuildProjectDirectory)\$(_LocalizationResourceDir)</_LocalizationResourceDirAbs>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(EnableLocalizationRuntimeAutoIncludes)' == 'true'
+                        and Exists('$(_LocalizationResourceDirAbs)')">
+    <AdditionalFiles Include="$(_LocalizationResourceDirAbs)*.json" />
+  </ItemGroup>
+
+</Project>

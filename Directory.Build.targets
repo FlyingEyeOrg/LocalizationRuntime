@@ -1,0 +1,10 @@
+<Project>
+
+  <!--
+    Directory.Build.targets 在 csproj 主体之后求值，正好对应包内 build/*.targets 的时机。
+    仓库内的项目（samples 里直接以 ProjectReference 引用生成器）靠这一行拿到资源挂载；
+    仓库外的项目由 NuGet 自动导入。
+  -->
+  <Import Project="$(MSBuildThisFileDirectory)src\LocalizationRuntime.Generator\build\LocalizationRuntime.Generator.targets" />
+
+</Project>

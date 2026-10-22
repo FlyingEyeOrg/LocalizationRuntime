@@ -1,0 +1,38 @@
+<Project>
+
+  <!--
+    LocalizationRuntime.Generator 的默认配置。
+    这里是 NuGet 包导入的 props（在 csproj 主体之前求值），所以只放"默认值"，
+    不放 ItemGroup——否则用户写在 csproj 里的覆盖来不及生效。
+
+    覆盖优先级（后者胜出）：
+      包默认值  <  用户的 Directory.Build.props  <  csproj 主体  <  命令行 -p:
+    三处都用 Condition="'$(x)' == ''" 保护，所以任何一处显式赋值都会被尊重。
+  -->
+
+  <PropertyGroup>
+    <!-- 资源目录，相对项目根；可写成多级，例如 Resources\I18n -->
+    <LocalizationDirectory Condition="'$(LocalizationDirectory)' == ''">Localization</LocalizationDirectory>
+
+    <!-- 基语言：定义键集合，也是其它语言缺键时的回退目标 -->
+    <LocalizationDefaultCulture Condition="'$(LocalizationDefaultCulture)' == ''">zh-CN</LocalizationDefaultCulture>
+
+    <!-- 生成的门面类名，与 LocalizationKeys 一起构成 {ClassName} / {ClassName}Keys -->
+    <LocalizationClassName Condition="'$(LocalizationClassName)' == ''">L</LocalizationClassName>
+
+    <!-- 生成代码的命名空间后缀，最终为 RootNamespace + 后缀 -->
+    <LocalizationNamespaceSuffix Condition="'$(LocalizationNamespaceSuffix)' == ''">.Localization</LocalizationNamespaceSuffix>
+
+    <!-- 关掉自动挂载，改用自己声明的 AdditionalFiles -->
+    <EnableLocalizationRuntimeAutoIncludes Condition="'$(EnableLocalizationRuntimeAutoIncludes)' == ''">true</EnableLocalizationRuntimeAutoIncludes>
+  </PropertyGroup>
+
+  <!-- 生成器通过 AnalyzerConfigOptions 读这些属性，不声明则收不到 -->
+  <ItemGroup>
+    <CompilerVisibleProperty Include="RootNamespace" />
+    <CompilerVisibleProperty Include="LocalizationDefaultCulture" />
+    <CompilerVisibleProperty Include="LocalizationClassName" />
+    <CompilerVisibleProperty Include="LocalizationNamespaceSuffix" />
+  </ItemGroup>
+
+</Project>

@@ -15,29 +15,9 @@
   </PropertyGroup>
 
   <!--
-    本地化配置。资源目录默认 Localization/，文件名即 culture（zh-CN.json）。
-    基语言既是键集合的定义处，也是其它语言缺键时的回退目标。
+    仓库内直接复用包里那两份构建文件，保证"本地开发"和"装 NuGet 包"走同一套逻辑，
+    不会出现两边行为不一致。用户项目则由 NuGet 自动导入 build/ 下的同名文件。
   -->
-  <PropertyGroup>
-    <LocalizationDirectory Condition="'$(LocalizationDirectory)' == ''">Localization</LocalizationDirectory>
-    <LocalizationDefaultCulture Condition="'$(LocalizationDefaultCulture)' == ''">zh-CN</LocalizationDefaultCulture>
-    <LocalizationClassName Condition="'$(LocalizationClassName)' == ''">L</LocalizationClassName>
-    <LocalizationNamespaceSuffix Condition="'$(LocalizationNamespaceSuffix)' == ''">.Localization</LocalizationNamespaceSuffix>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <CompilerVisibleProperty Include="RootNamespace" />
-    <CompilerVisibleProperty Include="LocalizationDefaultCulture" />
-    <CompilerVisibleProperty Include="LocalizationClassName" />
-    <CompilerVisibleProperty Include="LocalizationNamespaceSuffix" />
-  </ItemGroup>
-
-  <!--
-    项目目录下存在资源目录时才挂到编译输入上；没有该目录的项目完全不受影响。
-    生成器只能看到 AdditionalFiles 里的文件，这是整条链路的入口。
-  -->
-  <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)\$(LocalizationDirectory)')">
-    <AdditionalFiles Include="$(MSBuildProjectDirectory)\$(LocalizationDirectory)\*.json" />
-  </ItemGroup>
+  <Import Project="$(MSBuildThisFileDirectory)src\LocalizationRuntime.Generator\build\LocalizationRuntime.Generator.props" />
 
 </Project>
