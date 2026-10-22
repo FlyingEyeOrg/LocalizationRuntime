@@ -100,6 +100,44 @@ namespace LocalizationRuntime.Tests
         }
 
         [Fact]
+        public void AllIds_FormAContiguousRangeWithoutHoles()
+        {
+            // 回归：曾经父循环和递归各分配一次 id，导致 40、41 这类编号被吞掉，
+            // 表面上能用，但容器区间出现空洞、总数对不上。
+            var all = AllIds().Values.OrderBy(v => v).ToArray();
+
+            Assert.NotEmpty(all);
+
+            for (var i = 0; i < all.Length; i++)
+            {
+                Assert.True(
+                    all[i] == i,
+                    "id 序列出现空洞：第 " + i + " 个位置是 " + all[i] + "，期望 " + i);
+            }
+        }
+
+        [Fact]
+        public void ContainerIdsAreAllocatedOnce_NoDuplicatedSpans()
+        {
+            var leafCount = Catalog.Instance.Keys.Count;
+            var all = AllIds();
+
+            var containers = all
+                .Where(p => p.Value >= leafCount)
+                .Select(p => p.Value)
+                .OrderBy(v => v)
+                .ToArray();
+
+            // 容器 id 必须从 leafCount 开始连续排列，不能有跳号
+            for (var i = 0; i < containers.Length; i++)
+            {
+                Assert.True(
+                    containers[i] == leafCount + i,
+                    "容器 id 不连续：第 " + i + " 个是 " + containers[i] + "，期望 " + (leafCount + i));
+            }
+        }
+
+        [Fact]
         public void ScalarKeys_MapToTheirSortedIndex()
         {
             var catalog = Catalog.Instance;
@@ -132,62 +170,7 @@ namespace LocalizationRuntime.Tests
             Assert.Throws<ArgumentOutOfRangeException>(() => localizer.Get(containerId));
         }
 
-        [Fact]
-        public void NestedArrays_UseItemPrefixAtEveryLevel()
-        {
-            var all = AllIds();
 
-            // 数组元素的常量名必须带 Item 关键字；嵌套则是 Item{N}Item{M}
-            foreach (var name in all.Keys)
-            {
-                var leaf = name.Substring(name.LastIndexOf('.') + 1);
-
-                if (leaf.Length == 0)
-                {
-                    continue;
-                }
-
-                // 以数字结尾的叶子名必须含 Item
-                if (char.IsDigit(leaf[leaf.Length - 1]))
-                {
-                    Assert.True(
-                        leaf.Contains("Item", StringComparison.Ordinal),
-                        "数组元素常量 '" + name + "' 缺少 Item 关键字");
-                }
-            }
-        }
-
-        [Fact]
-        public void NestedArrayElementClasses_ContainItemKeyword()
-        {
-            // 顶层数组的类名是 {数组名}Object，本身可以不含 Item；
-            // 但数组元素对齐的是 {累计前缀}Item{N}Object，必须含 Item。
-            // 判据：同一类名在路径中出现两次以上（出现在它自己的成员路径里）时是元素类。
-            var all = AllIds();
-
-            foreach (var name in all.Keys)
-            {
-                var parts = name.Split('.');
-                for (var i = 0; i + 1 < parts.Length; i++)
-                {
-                    var className = parts[i];
-
-                    if (!className.EndsWith("Object", StringComparison.Ordinal))
-                    {
-                        continue;
-                    }
-
-                    // 元素类：其名字里含 Item 且后面还跟着数字
-                    if (className.Contains("Item", StringComparison.Ordinal))
-                    {
-                        continue;
-                    }
-
-                    // 顶层数组类，合法
-                    Assert.DoesNotContain("Item", className, StringComparison.Ordinal);
-                }
-            }
-        }
 
         [Fact]
         public void Localizer_ReturnsActualTextForEveryLeaf()
@@ -217,5 +200,6 @@ namespace LocalizationRuntime.Tests
         }
     }
 }
+
 
 

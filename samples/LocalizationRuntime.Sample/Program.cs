@@ -32,7 +32,7 @@ namespace LocalizationRuntime.Sample
 
             // 切回中文：同一个 Localizer 实例，再读就是中文
             localizer.SetCulture(CultureInfo.GetCultureInfo("zh-CN"));
-            Console.WriteLine("切回 zh-CN: App.Title = " + localizer.Get(LocalizationIds.App.Title));
+            Console.WriteLine("切回 zh-CN: App.Title = " + localizer.Get(LocalizationIds.AppObject.Title));
             Console.WriteLine();
 
             // 幂等：同语言不递增版本号
@@ -50,23 +50,23 @@ namespace LocalizationRuntime.Sample
             Console.WriteLine("culture          : " + l.CurrentCulture.Name);
 
             // ① 标量
-            Console.WriteLine("App.Title        : " + l.Get(LocalizationIds.App.Title));
+            Console.WriteLine("App.Title        : " + l.Get(LocalizationIds.AppObject.Title));
             Console.WriteLine("App.ConfirmDelete: " +
-                string.Format(l.CurrentCulture, l.Get(LocalizationIds.App.ConfirmDelete), "刀具 A"));
+                string.Format(l.CurrentCulture, l.Get(LocalizationIds.AppObject.ConfirmDelete), "刀具 A"));
 
             // ② 多层嵌套对象
-            Console.WriteLine("MainWindow.Title : " + l.Get(LocalizationIds.MainWindow.Title));
-            Console.WriteLine("ToolInfo.UserName: " + l.Get(LocalizationIds.MainWindow.ToolInfo.UserName));
+            Console.WriteLine("MainWindow.Title : " + l.Get(LocalizationIds.MainWindowObject.Title));
+            Console.WriteLine("ToolInfo.UserName: " + l.Get(LocalizationIds.MainWindowObject.ToolInfoObject.UserName));
             Console.WriteLine("Dept.Name        : " +
-                l.Get(LocalizationIds.MainWindow.ToolInfo.Department.Name));
+                l.Get(LocalizationIds.MainWindowObject.ToolInfoObject.DepartmentObject.Name));
 
             // ③ 字符串数组
             Console.Write("MainWindow.Tabs  : ");
             Console.WriteLine(string.Join(" | ", new[]
             {
-                l.Get(LocalizationIds.MainWindow.TabsObject.TabsItem0),
-                l.Get(LocalizationIds.MainWindow.TabsObject.TabsItem1),
-                l.Get(LocalizationIds.MainWindow.TabsObject.TabsItem2)
+                l.Get(LocalizationIds.MainWindowObject.TabsObject.TabsItem0),
+                l.Get(LocalizationIds.MainWindowObject.TabsObject.TabsItem1),
+                l.Get(LocalizationIds.MainWindowObject.TabsObject.TabsItem2)
             }));
 
             // ④ 对象数组
@@ -114,8 +114,10 @@ namespace LocalizationRuntime.Sample
             }));
 
             // ⑨ 回退：ja-JP 没有 Cancel，应显示 zh-CN 的"取消"
-            Console.WriteLine("Common.Cancel    : " + l.Get(LocalizationIds.Common.Cancel));
+            Console.WriteLine("Common.Cancel    : " + l.Get(LocalizationIds.CommonObject.Cancel));
             Console.WriteLine();
         }
     }
 }
+
+

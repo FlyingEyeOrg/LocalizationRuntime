@@ -36,10 +36,63 @@ namespace LocalizationRuntime.Generator
                     GetOption(p, "build_property.LocalizationNamespaceSuffix") ?? ".Localization",
                     GetOption(p, "build_property.LocalizationDefaultCulture") ?? "zh-CN"));
 
+            // 诊断的抑制与升级走 MSBuild 属性，理由见 ReadSeverityOverrides。
+            var severities = context.AnalyzerConfigOptionsProvider
+                .Select(static (p, _) => ReadSeverityOverrides(p));
+
             var model = files.Combine(settings)
                 .Select(static (pair, ct) => Build(pair.Left.ToArray(), pair.Right, ct));
 
-            context.RegisterSourceOutput(model, static (spc, m) => Emit(spc, m));
+            context.RegisterSourceOutput(
+                model.Combine(severities),
+                static (spc, pair) => Emit(spc, pair.Left, pair.Right));
+        }
+
+        /// <summary>
+        /// 读取诊断的抑制与升级配置。
+        ///
+        /// 为什么不用 .editorconfig 的 dotnet_diagnostic.&lt;id&gt;.severity：
+        /// 那类配置由编译器的诊断过滤层处理，不会进入 AnalyzerConfigOptionsProvider，
+        /// 源生成器读不到（已用探针验证过）。因此改读两个 MSBuild 属性：
+        ///
+        ///   &lt;LocalizationSuppressedDiagnostics&gt;LR1006;LR1008&lt;/LocalizationSuppressedDiagnostics&gt;
+        ///   &lt;LocalizationDiagnosticsAsErrors&gt;LR1010&lt;/LocalizationDiagnosticsAsErrors&gt;
+        ///
+        /// 多个 ID 用逗号或分号分隔。
+        /// </summary>
+        private static Dictionary<string, DiagnosticSeverity> ReadSeverityOverrides(
+            AnalyzerConfigOptionsProvider provider)
+        {
+            var result = new Dictionary<string, DiagnosticSeverity>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var id in SplitIds(GetOption(provider, "build_property.LocalizationSuppressedDiagnostics")))
+            {
+                result[id] = DiagnosticSeverity.Hidden;
+            }
+
+            foreach (var id in SplitIds(GetOption(provider, "build_property.LocalizationDiagnosticsAsErrors")))
+            {
+                result[id] = DiagnosticSeverity.Error;
+            }
+
+            return result;
+        }
+
+        private static IEnumerable<string> SplitIds(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                yield break;
+            }
+
+            foreach (var part in value!.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var trimmed = part.Trim();
+                if (trimmed.Length > 0)
+                {
+                    yield return trimmed;
+                }
+            }
         }
 
         private static string? GetOption(AnalyzerConfigOptionsProvider provider, string name)
@@ -269,7 +322,10 @@ namespace LocalizationRuntime.Generator
                 diagnostics.ToArray());
         }
 
-        private static void Emit(SourceProductionContext context, ResourceModel model)
+        private static void Emit(
+            SourceProductionContext context,
+            ResourceModel model,
+            System.Collections.Generic.Dictionary<string, DiagnosticSeverity> severityOverrides)
         {
             foreach (var d in model.Diagnostics)
             {
@@ -277,6 +333,21 @@ namespace LocalizationRuntime.Generator
                 if (descriptor == null)
                 {
                     continue;
+                }
+
+                // 应用 .editorconfig 覆盖。
+                // 源生成器通过 ReportDiagnostic 上报的诊断不会自动套用
+                // dotnet_diagnostic.<id>.severity，所以这里自己读配置。
+                DiagnosticSeverity? overrideSeverity = null;
+                DiagnosticSeverity configured;
+                if (severityOverrides.TryGetValue(d.Id, out configured))
+                {
+                    if (configured == DiagnosticSeverity.Hidden)
+                    {
+                        continue;   // 抑制
+                    }
+
+                    overrideSeverity = configured;
                 }
 
                 var location = Location.None;
@@ -289,7 +360,17 @@ namespace LocalizationRuntime.Generator
                         new LinePositionSpan(position, position));
                 }
 
-                context.ReportDiagnostic(Diagnostic.Create(descriptor, location, d.Message));
+                var diagnostic = overrideSeverity.HasValue
+                    ? Diagnostic.Create(
+                        descriptor,
+                        location,
+                        overrideSeverity.Value,
+                        null,
+                        System.Collections.Immutable.ImmutableDictionary<string, string?>.Empty,
+                        d.Message)
+                    : Diagnostic.Create(descriptor, location, d.Message);
+
+                context.ReportDiagnostic(diagnostic);
             }
 
             if (!model.HasKeys)
@@ -452,9 +533,13 @@ namespace LocalizationRuntime.Generator
             }
 
             /// <summary>
-            /// 深度优先给容器节点分配结构 id：
-            ///   Data=14 → DataItem0=15 → DataItem0Item0=16 → DataItem0Item1=17 → DataItem1=18 → ...
-            /// 每个元素先占 id，然后立刻展开它自己的子树，因此父级元素的兄弟编号会跳开。
+            /// 深度优先给每个「数组节点」和「数组元素」各分配一个结构 id，
+            /// 每个节点只分配一次，因此编号连续、无空洞：
+            ///   Data=14 → DataItem0=15 → DataItem0Item0=16 → DataItem0Item1=17
+            ///   → DataItem1=18 → DataItem1Item0=19 → DataItem1Item1=20 → Menus=21 ...
+            ///
+            /// 所有非叶子节点都占一个：数组、数组元素、普通对象（App / MainWindow / ToolInfo）。
+            /// 因为类名统一带 Object 后缀，常量与类不会撞名（CS0102）。
             /// </summary>
             internal int AssignContainerIds(int next)
             {
@@ -462,49 +547,14 @@ namespace LocalizationRuntime.Generator
                 {
                     var child = Children[i];
 
-                    // 叶子已有真实下标，不占容器 id
-                    if (child.Children.Count == 0)
-                    {
-                        continue;
-                    }
-
-                    if (child.IsArray)
+                    // 叶子（含字符串数组的元素）已有真实下标，不参与；
+                    // 其余每个非叶子节点都占一个结构 id。
+                    if (child.Children.Count > 0)
                     {
                         child.Id = next++;
                     }
 
-                    // 元素逐个占 id，并立即展开其子树
-                    for (var j = 0; j < child.Children.Count; j++)
-                    {
-                        var element = child.Children[j];
-
-                        if (element.Children.Count > 0)
-                        {
-                            element.Id = next++;
-
-                            // 元素自身也是数组时，它的元素同样要占 id，
-                            // 这样编号顺序才是 DataItem0=15, DataItem0Item0=16, DataItem0Item1=17, DataItem1=18
-                            if (element.IsArray)
-                            {
-                                for (var k = 0; k < element.Children.Count; k++)
-                                {
-                                    var grand = element.Children[k];
-                                    if (grand.Children.Count > 0)
-                                    {
-                                        grand.Id = next++;
-                                    }
-                                }
-                            }
-
-                            next = element.AssignContainerIds(next);
-                        }
-                    }
-
-                    // 非数组的普通对象子树
-                    if (!child.IsArray)
-                    {
-                        next = child.AssignContainerIds(next);
-                    }
+                    next = child.AssignContainerIds(next);
                 }
 
                 return next;
@@ -541,7 +591,7 @@ namespace LocalizationRuntime.Generator
 
                     sb.Append(indent);
                     sb.Append("public static class ");
-                    sb.Append(name);
+                    sb.Append(child.ClassName);
                     sb.AppendLine("Object");
                     sb.Append(indent);
                     sb.AppendLine("{");
@@ -594,24 +644,16 @@ namespace LocalizationRuntime.Generator
                     continue;
                 }
 
-                // ── 普通对象：static class ──
-                // 顶层普通对象用原名（App / Common）；只有数组元素内部的节点
-                // 才带 Object 后缀，与 {累计前缀}Item{N}Object 对应。
-                var objectClassName = child.IsArrayElement
-                    ? child.ClassName + "Object"
-                    : child.ClassName;
+                // ── 普通对象：常量 + {名}Object 类 ──
+                // 与数组完全同构：常量名不带后缀，类名带 Object 后缀。
+                var objectClassName = child.ClassName + "Object";
 
-                // 顶层非叶子节点（数组元素本身）先把 id 暴露成常量，
-                // 这样 DataItem0Object 里就有 DataItem0Item0 / DataItem0Item1。
-                if (child.Id.HasValue && child.IsArrayElement)
-                {
-                    sb.Append(indent);
-                    sb.Append("public const int ");
-                    sb.Append(Sanitize(child.Name!));
-                    sb.Append(" = ");
-                    sb.Append(child.Id.Value.ToString(CultureInfo.InvariantCulture));
-                    sb.AppendLine(";");
-                }
+                sb.Append(indent);
+                sb.Append("public const int ");
+                sb.Append(Sanitize(child.Name!));
+                sb.Append(" = ");
+                sb.Append(child.Id.GetValueOrDefault().ToString(CultureInfo.InvariantCulture));
+                sb.AppendLine(";");
 
                 sb.Append(indent);
                 sb.Append("public static class ");
@@ -986,6 +1028,14 @@ namespace LocalizationRuntime.Generator
         public List<ResourceFlattener.Entry> Entries { get; }
     }
 }
+
+
+
+
+
+
+
+
 
 
 

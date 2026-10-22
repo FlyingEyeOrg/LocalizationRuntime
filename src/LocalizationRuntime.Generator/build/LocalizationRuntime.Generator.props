@@ -25,6 +25,14 @@
 
     <!-- 关掉自动挂载，改用自己声明的 AdditionalFiles -->
     <EnableLocalizationRuntimeAutoIncludes Condition="'$(EnableLocalizationRuntimeAutoIncludes)' == ''">true</EnableLocalizationRuntimeAutoIncludes>
+
+    <!--
+      诊断抑制与升级。逗号或分号分隔多个规则 ID，例如 LR1006 或 LR1006;LR1008。
+      源生成器上报的诊断不会自动套用 .editorconfig 的 dotnet_diagnostic.<id>.severity，
+      所以用这两个属性代替。
+    -->
+    <LocalizationSuppressedDiagnostics Condition="'$(LocalizationSuppressedDiagnostics)' == ''"></LocalizationSuppressedDiagnostics>
+    <LocalizationDiagnosticsAsErrors Condition="'$(LocalizationDiagnosticsAsErrors)' == ''"></LocalizationDiagnosticsAsErrors>
   </PropertyGroup>
 
   <!-- 生成器通过 AnalyzerConfigOptions 读这些属性，不声明则收不到 -->
@@ -33,6 +41,9 @@
     <CompilerVisibleProperty Include="LocalizationDefaultCulture" />
     <CompilerVisibleProperty Include="LocalizationClassName" />
     <CompilerVisibleProperty Include="LocalizationNamespaceSuffix" />
+    <CompilerVisibleProperty Include="LocalizationSuppressedDiagnostics" />
+    <CompilerVisibleProperty Include="LocalizationDiagnosticsAsErrors" />
   </ItemGroup>
 
 </Project>
+

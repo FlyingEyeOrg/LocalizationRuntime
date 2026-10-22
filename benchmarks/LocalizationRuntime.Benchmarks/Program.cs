@@ -70,7 +70,7 @@ namespace LocalizationRuntime.Benchmarks
         private static void RunGetById(Localizer localizer, int n)
         {
             var sink = 0;
-            var id = LocalizationIds.Common.Key0;
+            var id = LocalizationIds.CommonObject.Key0;
 
             for (var i = 0; i < n; i++)
             {
@@ -115,4 +115,5 @@ namespace LocalizationRuntime.Benchmarks
         private static int Sink;
     }
 }
+
 

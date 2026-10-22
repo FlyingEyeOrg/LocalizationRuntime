@@ -9,6 +9,8 @@
     <!-- 便于排查生成物；正式项目不需要开。 -->
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
     <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
+    <!-- 示例刻意让 ja-JP 缺 Common.Cancel 以演示回退，这条诊断是预期行为。 -->
+    <LocalizationSuppressedDiagnostics>LR1006</LocalizationSuppressedDiagnostics>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,3 +21,5 @@
   </ItemGroup>
 
 </Project>
+
+
