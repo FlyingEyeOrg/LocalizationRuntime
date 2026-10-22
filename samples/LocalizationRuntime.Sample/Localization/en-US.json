@@ -4,6 +4,7 @@
     "ConfirmDelete": "Delete {0}?",
     "ItemCount": "{0} items"
   },
+
   "MainWindow": {
     "Title": "Tool Retraction Control",
     "Tabs": [
@@ -11,15 +12,61 @@
       "Device Info",
       "Tool Management",
       "Mold Management",
-      "KDL Settings",
-      "Change History",
-      "Monitor Log",
-      "User Settings",
-      "Tool Life Preview",
-      "Config Import/Export",
-      "User Management"
-    ]
+      "KDL Settings"
+    ],
+
+    "ToolInfo": {
+      "UserName": "Operator",
+      "UserAge": "Age",
+      "Department": {
+        "Name": "Department",
+        "Code": "Dept. Code"
+      }
+    }
   },
+
+  "Menus": [
+    { "Title": "File", "Shortcut": "Ctrl+F" },
+    { "Title": "Edit", "Shortcut": "Ctrl+E" },
+    { "Title": "View", "Shortcut": "Ctrl+V" }
+  ],
+
+  "Grid": [
+    [
+      { "Header": "Name", "Width": "120" },
+      { "Header": "Spec", "Width": "80" }
+    ],
+    [
+      { "Header": "Qty", "Width": "60" }
+    ]
+  ],
+
+  "Matrix": [
+    [ "A1", "A2" ],
+    [ "B1" ]
+  ],
+
+  "Cube": [
+    [
+      [ "Layer 1 Cell 1" ],
+      [ "Layer 1 Cell 2" ]
+    ],
+    [
+      [ "Layer 2 Cell 1" ]
+    ]
+  ],
+
+  "Groups": [
+    {
+      "Name": "Roughing",
+      "Items": [ "Outer", "Face" ]
+    },
+    {
+      "Name": "Finishing",
+      "Items": [ "Chamfer" ]
+    }
+  ],
+
   "Common": {
     "Ok": "OK",
     "Cancel": "Cancel"

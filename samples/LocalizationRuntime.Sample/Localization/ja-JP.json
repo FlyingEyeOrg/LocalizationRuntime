@@ -4,6 +4,7 @@
     "ConfirmDelete": "{0} を削除しますか？",
     "ItemCount": "全 {0} 件"
   },
+
   "MainWindow": {
     "Title": "工具后退管理システム",
     "Tabs": [
@@ -11,15 +12,61 @@
       "設備情報",
       "工具管理",
       "型番管理",
-      "KDL 設定",
-      "交換履歴",
-      "監視ログ",
-      "ユーザー設定",
-      "工具寿命プレビュー",
-      "設定のインポート/エクスポート",
-      "ユーザー管理"
-    ]
+      "KDL 設定"
+    ],
+
+    "ToolInfo": {
+      "UserName": "オペレーター",
+      "UserAge": "年齢",
+      "Department": {
+        "Name": "部署名",
+        "Code": "部署コード"
+      }
+    }
   },
+
+  "Menus": [
+    { "Title": "ファイル", "Shortcut": "Ctrl+F" },
+    { "Title": "編集", "Shortcut": "Ctrl+E" },
+    { "Title": "表示", "Shortcut": "Ctrl+V" }
+  ],
+
+  "Grid": [
+    [
+      { "Header": "名称", "Width": "120" },
+      { "Header": "仕様", "Width": "80" }
+    ],
+    [
+      { "Header": "数量", "Width": "60" }
+    ]
+  ],
+
+  "Matrix": [
+    [ "A1", "A2" ],
+    [ "B1" ]
+  ],
+
+  "Cube": [
+    [
+      [ "一層一目" ],
+      [ "一層二目" ]
+    ],
+    [
+      [ "二層一目" ]
+    ]
+  ],
+
+  "Groups": [
+    {
+      "Name": "粗加工",
+      "Items": [ "外周", "端面" ]
+    },
+    {
+      "Name": "仕上げ",
+      "Items": [ "面取り" ]
+    }
+  ],
+
   "Common": {
     "Ok": "OK"
   }

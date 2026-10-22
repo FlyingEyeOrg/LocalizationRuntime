@@ -4,6 +4,7 @@
     "ConfirmDelete": "确定删除 {0}？",
     "ItemCount": "共 {0} 项"
   },
+
   "MainWindow": {
     "Title": "退刀管控系统",
     "Tabs": [
@@ -11,15 +12,61 @@
       "设备信息",
       "刀具管理",
       "模号管理",
-      "KDL 设置",
-      "更换历史",
-      "监控日志",
-      "用户设置",
-      "刀具寿命预览",
-      "配置导入导出",
-      "用户管理"
-    ]
+      "KDL 设置"
+    ],
+
+    "ToolInfo": {
+      "UserName": "操作员",
+      "UserAge": "年龄",
+      "Department": {
+        "Name": "部门名称",
+        "Code": "部门编号"
+      }
+    }
   },
+
+  "Menus": [
+    { "Title": "文件", "Shortcut": "Ctrl+F" },
+    { "Title": "编辑", "Shortcut": "Ctrl+E" },
+    { "Title": "视图", "Shortcut": "Ctrl+V" }
+  ],
+
+  "Grid": [
+    [
+      { "Header": "名称", "Width": "120" },
+      { "Header": "规格", "Width": "80" }
+    ],
+    [
+      { "Header": "数量", "Width": "60" }
+    ]
+  ],
+
+  "Matrix": [
+    [ "A1", "A2" ],
+    [ "B1" ]
+  ],
+
+  "Cube": [
+    [
+      [ "一层一格" ],
+      [ "一层二格" ]
+    ],
+    [
+      [ "二层一格" ]
+    ]
+  ],
+
+  "Groups": [
+    {
+      "Name": "粗加工",
+      "Items": [ "外圆", "端面" ]
+    },
+    {
+      "Name": "精加工",
+      "Items": [ "倒角" ]
+    }
+  ],
+
   "Common": {
     "Ok": "确定",
     "Cancel": "取消"

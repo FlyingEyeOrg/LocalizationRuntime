@@ -20,6 +20,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- 诊断规则的发布跟踪：RS2008 要求规则 ID 一经发布即冻结。 -->
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- 生成器打进 analyzers 路径，用户 PackageReference 即生效。 -->
     <None Include="$(OutputPath)\$(AssemblyName).dll"
           Pack="true"
@@ -39,3 +44,4 @@
   </ItemGroup>
 
 </Project>
+
