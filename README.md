@@ -14,7 +14,7 @@ l.App.Title.Value;                              // "Tool Retraction Control"
 核心只有两件事：**按 key 取当前语言的值**，**设置当前语言**。
 
 ```csharp
-localizer.Get(Keys.App.Title);                      // 编译期 id，最快
+localizer.Get(TextIds.App.Title);                   // 编译期 id，最快
 localizer.Get("App.Title");                         // 字符串 key
 localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
 ```
@@ -59,7 +59,7 @@ localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
 对上面三个文件，生成器产出：
 
 ```csharp
-internal static class Keys               // 键 → 编译期 id，结构与 JSON 层级一致
+internal static class TextIds            // 键 → 编译期 id，结构与 JSON 层级一致
 {
     public static class App
     {
@@ -79,7 +79,7 @@ internal sealed class L                 // 强类型访问器
 }
 ```
 
-键的层级与 JSON 完全对应，所以 `MainWindow.UserInfo.UserName` 就是 `Keys.MainWindow.UserInfo.UserName`。
+键的层级与 JSON 完全对应，所以 `MainWindow.UserInfo.UserName` 就是 `TextIds.MainWindow.UserInfo.UserName`。
 数组元素无法作为合法标识符，压平成 `Tabs_0` / `Tabs_10`。
 
 访问器分两类：

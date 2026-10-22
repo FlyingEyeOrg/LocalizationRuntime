@@ -310,13 +310,13 @@ namespace LocalizationRuntime.Generator
             sb.AppendLine(";");
             sb.AppendLine();
             sb.AppendLine("/// <summary>编译期键 id。由生成器产出，不要手写。</summary>");
-            sb.AppendLine("internal static class Keys");
+            sb.AppendLine("internal static class TextIds");
             sb.AppendLine("{");
 
             // 按 JSON 层级递归建嵌套静态类：
             //   MainWindow.UserInfo.UserName
             // 变成
-            //   LKeys.MainWindow.UserInfo.UserName
+            //   TextIds.MainWindow.UserInfo.UserName
             var root = new KeyNode(null);
             foreach (var key in model.Keys)
             {
@@ -369,7 +369,7 @@ namespace LocalizationRuntime.Generator
                     var isLast = i == segments.Length - 1;
 
                     // 数组元素（Tabs.0、MainWindow.Tabs.3）：整段压平成 Tabs_0，
-                    // 挂到"再上一级"节点下，避免生成 LKeys.Tabs._0 这种名字。
+                    // 挂到"再上一级"节点下，避免生成 TextIds.Tabs._0 这种名字。
                     if (!isLast && IsAllDigits(segments[i + 1]))
                     {
                         var flat = segments[i] + "_" + segments[i + 1];
@@ -602,7 +602,7 @@ namespace LocalizationRuntime.Generator
 
         private static void EmitAccessors(StringBuilder sb, ResourceModel model)
         {
-            var keysClass = "Keys";
+            var keysClass = "TextIds";
 
             sb.Append("internal sealed partial class ");
             sb.Append(model.ClassName);
