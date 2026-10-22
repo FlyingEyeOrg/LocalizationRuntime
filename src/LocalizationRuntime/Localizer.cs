@@ -63,6 +63,14 @@ namespace LocalizationRuntime
             }
 
             var culture = initialCulture ?? DetectSystemCulture();
+
+            // 与 SetCulture 保持一致：不受支持的语言落到基语言，
+            // 否则 CurrentCulture 与值的来源会自相矛盾。
+            if (culture.Name.Length > 0 && !IsSupportedOrAncestor(culture.Name))
+            {
+                culture = CultureInfo.GetCultureInfo(catalog.DefaultCultureName);
+            }
+
             _snapshot = new Snapshot(Resolve(culture.Name), culture, 0);
             _nextRevision = 1;
         }
@@ -111,7 +119,10 @@ namespace LocalizationRuntime
 
         /// <summary>
         /// 切换语言。无 IO，同步完成；返回是否真的发生了切换。
-        /// 切换后再次取值即得到新语言的值。
+        ///
+        /// 传入不受支持的语言时，实际生效的是回退链的终点（基语言），
+        /// 因此 <see cref="CurrentCulture"/> 报的是真正生效的语言，不会出现
+        /// "报 de-DE、值是 zh-CN" 这种自相矛盾的状态。
         /// </summary>
         public bool SetCulture(CultureInfo culture)
         {
@@ -123,19 +134,43 @@ namespace LocalizationRuntime
             lock (_gate)
             {
                 var snapshot = Volatile.Read(ref _snapshot);
-                if (string.Equals(snapshot.Culture.Name, culture.Name, StringComparison.OrdinalIgnoreCase))
-                {
-                    return false;
-                }
 
                 var current = culture.Name.Length == 0
                     ? CultureInfo.GetCultureInfo(_catalog.DefaultCultureName)
                     : culture;
 
+                // 不属于任何受支持语言（含其 Parent 链）时，落到基语言，
+                // 保证 CurrentCulture 与值的来源一致。
+                if (!IsSupportedOrAncestor(current.Name))
+                {
+                    current = CultureInfo.GetCultureInfo(_catalog.DefaultCultureName);
+                }
+
+                if (string.Equals(snapshot.Culture.Name, current.Name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
                 var revision = _nextRevision++;
                 Volatile.Write(ref _snapshot, new Snapshot(Resolve(current.Name), current, revision));
                 return true;
             }
+        }
+
+        /// <summary>该 culture 或其某个 Parent 是否在资源里存在。</summary>
+        private bool IsSupportedOrAncestor(string cultureName)
+        {
+            for (var c = CultureInfo.GetCultureInfo(cultureName);
+                 c != null && !string.IsNullOrEmpty(c.Name);
+                 c = c.Parent)
+            {
+                if (_supported.Contains(c.Name))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private CultureInfo DetectSystemCulture()

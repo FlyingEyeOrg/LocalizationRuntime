@@ -1,32 +1,67 @@
 {
-  "Scalar": "scalar",
+  "Scalar": "e01-scalar",
   "Group": {
-    "A": "1",
-    "Deep": { "B": "2", "C": { "D": "3" } }
+    "A": "e03-group-a",
+    "Deep": {
+      "B": "e05-deep-b",
+      "C": { "D": "e06-deep-c-d" }
+    }
   },
-  "StrArr": [ "a", "b", "c" ],
-  "OneStrArr": [ "only" ],
-  "ObjArr": [ { "K": "v" }, { "K": "w" } ],
-  "ArrArr": [ [ "a", "b" ], [ "c" ] ],
-  "ObjArrArr": [ [ { "V": "1" }, { "V": "2" } ], [ { "V": "3" } ] ],
-  "ArrObj": [ { "Sub": [ "x", "y" ] }, { "Sub": [ "z" ] } ],
-  "Cube": [ [ [ "a" ], [ "b" ] ], [ [ "c" ] ] ],
-  "Grid": [ [ { "H": "1", "W": "2" } ], [ { "H": "3", "W": "4" } ] ],
+  "StrArr": [ "e08-strarr-0", "e09-strarr-1", "e10-strarr-2" ],
+  "OneStrArr": [ "e11-onestrarr-0" ],
+  "ObjArr": [
+    { "K": "e12-objarr-0-k" },
+    { "K": "e13-objarr-1-k" }
+  ],
+  "ArrArr": [
+    [ "e14-arrarr-0-0", "e15-arrarr-0-1" ],
+    [ "e16-arrarr-1-0" ]
+  ],
+  "ObjArrArr": [
+    [
+      { "V": "e17-objarrarr-0-0-v" },
+      { "V": "e18-objarrarr-0-1-v" }
+    ],
+    [
+      { "V": "e19-objarrarr-1-0-v" }
+    ]
+  ],
+  "ArrObj": [
+    { "Sub": [ "e20-arrobj-0-sub-0", "e21-arrobj-0-sub-1" ] },
+    { "Sub": [ "e22-arobj-1-sub-0" ] }
+  ],
+  "Cube": [
+    [
+      [ "e23-cube-0-0-0" ],
+      [ "e24-cube-0-1-0" ]
+    ],
+    [
+      [ "e25-cube-1-0-0" ]
+    ]
+  ],
+  "Grid": [
+    [
+      { "H": "e26-grid-0-0-h", "W": "e27-grid-0-0-w" }
+    ],
+    [
+      { "H": "e28-grid-1-0-h", "W": "e29-grid-1-0-w" }
+    ]
+  ],
   "DeepObjArr": [
     {
-      "Name": "n1",
+      "Name": "e30-deepobjarr-0-name",
       "Inner": [
-        { "X": "1", "Y": "2" },
-        { "X": "3", "Y": "4" }
+        { "X": "e31-deepobjarr-0-inner-0-x", "Y": "e32-deepobjarr-0-inner-0-y" },
+        { "X": "e33-deepobjarr-0-inner-1-x", "Y": "e34-deepobjarr-0-inner-1-y" }
       ]
     }
   ],
   "ObjWithObj": {
     "Level1": {
-      "Level2": {
-        "Leaf": "deep"
-      },
-      "Sibling": "s"
+      "Level2": { "Leaf": "e36-obwithobj-l1-l2-leaf" },
+      "Sibling": "e37-obwithobj-l1-sibling"
     }
   }
 }
+
+

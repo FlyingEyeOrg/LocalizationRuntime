@@ -16,6 +16,10 @@
   <ItemGroup>
     <!-- 测试用的资源集：覆盖标量、嵌套对象、字符串数组、对象数组、嵌套数组 -->
     <AdditionalFiles Include="$(MSBuildProjectDirectory)\Localization\*.json" />
+    <!-- 值校验测试需要读取原始 JSON 做三方比对 -->
+    <None Include="$(MSBuildProjectDirectory)\Localization\*.json"
+          CopyToOutputDirectory="PreserveNewest"
+          Link="Localization\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

@@ -195,11 +195,13 @@ namespace LocalizationRuntime.Tests
             localizer.SetCulture(System.Globalization.CultureInfo.GetCultureInfo("zh-CN"));
             var zh = localizer.Get(LocalizationIds.Scalar);
 
-            Assert.Equal("scalar", en);
-            Assert.Equal("单值", zh);
+            Assert.Equal("e01-scalar", en);
+            Assert.Equal("v01-scalar", zh);
         }
     }
 }
+
+
 
 
 
