@@ -1,0 +1,40 @@
+<Project>
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Company>FlyingEyeOrg</Company>
+    <Authors>FlyingEyeOrg</Authors>
+    <Version>0.1.0</Version>
+    <RepositoryUrl>https://github.com/FlyingEyeOrg/LocalizationRuntime</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);NU1900</NoWarn>
+  </PropertyGroup>
+
+  <!--
+    本地化配置。资源目录默认 Localization/，文件名即 culture（zh-CN.json）。
+    基语言既是键集合的定义处，也是其它语言缺键时的回退目标。
+  -->
+  <PropertyGroup>
+    <LocalizationDirectory Condition="'$(LocalizationDirectory)' == ''">Localization</LocalizationDirectory>
+    <LocalizationDefaultCulture Condition="'$(LocalizationDefaultCulture)' == ''">zh-CN</LocalizationDefaultCulture>
+    <LocalizationClassName Condition="'$(LocalizationClassName)' == ''">L</LocalizationClassName>
+    <LocalizationNamespaceSuffix Condition="'$(LocalizationNamespaceSuffix)' == ''">.Localization</LocalizationNamespaceSuffix>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <CompilerVisibleProperty Include="RootNamespace" />
+    <CompilerVisibleProperty Include="LocalizationDefaultCulture" />
+    <CompilerVisibleProperty Include="LocalizationClassName" />
+    <CompilerVisibleProperty Include="LocalizationNamespaceSuffix" />
+  </ItemGroup>
+
+  <!-- 引用了生成器包的项目自动把资源目录挂到编译输入上。 -->
+  <ItemGroup Condition="'$(EnableDefaultLocalizationItems)' != 'false'">
+    <AdditionalFiles Include="$(MSBuildProjectDirectory)\$(LocalizationDirectory)\*.json" />
+  </ItemGroup>
+
+</Project>

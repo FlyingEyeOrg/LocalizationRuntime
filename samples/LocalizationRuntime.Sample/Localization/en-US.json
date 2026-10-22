@@ -1,0 +1,27 @@
+{
+  "App": {
+    "Title": "Tool Retraction Control",
+    "ConfirmDelete": "Delete {0}?",
+    "ItemCount": "{0} items"
+  },
+  "MainWindow": {
+    "Title": "Tool Retraction Control",
+    "Tabs": [
+      "Change Tool",
+      "Device Info",
+      "Tool Management",
+      "Mold Management",
+      "KDL Settings",
+      "Change History",
+      "Monitor Log",
+      "User Settings",
+      "Tool Life Preview",
+      "Config Import/Export",
+      "User Management"
+    ]
+  },
+  "Common": {
+    "Ok": "OK",
+    "Cancel": "Cancel"
+  }
+}

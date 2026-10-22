@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
+    <AssemblyName>LocalizationRuntime</AssemblyName>
+    <RootNamespace>LocalizationRuntime</RootNamespace>
+    <PackageId>LocalizationRuntime</PackageId>
+    <Description>编译期固化多语言资源的 .NET 本地化运行时：运行时零文件 IO，按 CultureInfo 链回退取值。</Description>
+    <PackageTags>localization;i18n;l10n;culture;source-generator</PackageTags>
+    <EnableDefaultLocalizationItems>false</EnableDefaultLocalizationItems>
+  </PropertyGroup>
+
+</Project>
