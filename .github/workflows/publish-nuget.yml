@@ -101,7 +101,7 @@ jobs:
       - name: Verify symbol packages
         shell: pwsh
         run: |
-          $output = & ./eng/verify-symbols.ps1 -ArtifactsDirectory artifacts -PackageId LocalizationRuntime 2>&1 | Out-String
+          $output = & "$PWD/eng/verify-symbols.ps1" -ArtifactsDirectory artifacts -PackageId LocalizationRuntime 2>&1 | Out-String
           $code = $LASTEXITCODE
           Write-Output $output
 

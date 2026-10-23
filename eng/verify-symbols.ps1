@@ -17,7 +17,12 @@ param(
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-Add-Type -AssemblyName System.Reflection.Metadata -ErrorAction SilentlyContinue
+# .NET (Core) 上 System.Reflection.Metadata 默认已加载，不需要 Add-Type；
+# Windows PowerShell 5.1 里它不存在，所以这里不再强求，改为按需反射取类型。
+$metadataLoaded = $null -ne ([System.Management.Automation.PSTypeName]'System.Reflection.Metadata.MetadataReaderProvider').Type
+if (-not $metadataLoaded) {
+    throw "当前 PowerShell 缺少 System.Reflection.Metadata，无法校验 portable pdb。请用 PowerShell 7（pwsh）。"
+}
 
 function Expand-Package([string] $Path, [string] $Destination) {
     if (Test-Path $Destination) { Remove-Item $Destination -Recurse -Force }
