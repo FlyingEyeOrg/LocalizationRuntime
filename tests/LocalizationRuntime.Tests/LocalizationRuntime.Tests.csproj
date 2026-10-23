@@ -11,6 +11,8 @@
 
   <ItemGroup>
     <PackageReference Include="xunit" Version="2.9.2" />
+    <!-- 依赖注入测试需要真正的容器（ServiceCollection / BuildServiceProvider） -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
   </ItemGroup>
 
   <ItemGroup>

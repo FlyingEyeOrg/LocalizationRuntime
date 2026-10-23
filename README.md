@@ -23,6 +23,47 @@ localizer.GetAllValues(LocalizationIds.Matrix);               // ["A1", "A2", "B
 没有通知、没有订阅、没有弱引用。切语言后再次取值自然就是新语言的值——
 谁需要刷新界面，谁负责在切语言后重新读取。
 
+## 依赖注入
+
+ASP.NET Core 风格的容器可以直接接入。注册之后，任何在构造函数里声明 `Localizer`
+的类型都会由容器自动注入——业务代码不需要自己 `new`，也不需要知道 `Catalog` 的存在。
+
+```csharp
+// ① 注册，唯一一步，不需要传任何东西
+builder.Services.AddLocalizationRuntime();
+
+// ② 业务服务只声明需要什么
+public sealed class OrderService
+{
+    private readonly Localizer _localizer;
+
+    public OrderService(Localizer localizer) => _localizer = localizer;
+
+    public string Title => _localizer.Get(LocalizationIds.AppObject.Title);
+}
+```
+
+注册方法本身也是生成器产出的：它和 `Catalog` 同属你的程序集，因此直接使用
+`Catalog.Instance`，调用方既不用传 catalog，也不用知道它存在。
+
+`Localizer` 注册为**单例**：当前语言是进程级状态，`SetCulture` 对所有调用方生效。
+这与库的设计一致——没有按请求隔离的语言，也就没有 `AsyncLocal`、没有隐藏的状态传递。
+需要「每个用户自己的语言」时，应该在应用层按用户选择调用一次 `SetCulture`，
+或者为每种语言各建一个独立的宿主。
+
+可选参数指定初始语言，留空则按当前 UI culture 自动选择：
+
+```csharp
+builder.Services.AddLocalizationRuntime(CultureInfo.GetCultureInfo("en-US"));
+```
+
+重复注册是安全的（内部用 `TryAdd`），多个模块各自注册不会产生多份实例。
+
+为此运行时包引用了 `Microsoft.Extensions.DependencyInjection.Abstractions`（仅接口与
+`ServiceDescriptor`，体积很小）——生成的注册代码需要 `IServiceCollection`，
+靠这个依赖传递到你的项目，你不必再引一次。不用 DI 的场景可以完全忽略它，
+`new Localizer(Catalog.Instance)` 照旧可用。
+
 ## 两条设计决定
 
 **一、值在编译期固化，运行期只做选择。**
@@ -100,6 +141,7 @@ public static class LocalizationIds        // 键 → 编译期 id，结构与 J
     }
 }
 internal sealed class GeneratedCatalog  // 每语言一个 string?[]（未翻译为 null）+ 父子表
+public static class LocalizationServiceCollectionExtensions  // AddLocalizationRuntime()，见上文
 ```
 
 键的层级与 JSON 完全对应，所以 `MainWindow.UserInfo.UserName` 就是 `LocalizationIds.MainWindowObject.UserInfoObject.UserName`。
@@ -310,7 +352,7 @@ dotnet test tests/LocalizationRuntime.Tests
 ```
 src/LocalizationRuntime/               运行时（netstandard2.0 + net8.0）
 src/LocalizationRuntime.Generator/     Roslyn 增量生成器 + 包内 build/ 目标
-samples/LocalizationRuntime.Sample/    三种语言的示例
+samples/LocalizationRuntime.Sample/    三种语言的示例（依赖注入接入）
 tests/LocalizationRuntime.Tests/       xunit 测试
 tests/LocalizationRuntime.Tests.Runner/ 不依赖 VSTest 的测试执行器
 benchmarks/LocalizationRuntime.Benchmarks/ 1220 键规模的热路径基准

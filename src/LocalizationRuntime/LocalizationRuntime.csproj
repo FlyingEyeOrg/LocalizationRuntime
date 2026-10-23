@@ -9,4 +9,13 @@
     <PackageTags>localization;i18n;l10n;culture;source-generator</PackageTags>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!--
+      生成器会在使用方程序集里产出一个 AddLocalizationRuntime() 扩展方法，
+      它需要 IServiceCollection。这里声明依赖，使用方就能通过本包传递拿到该类型，
+      不必自己再引一次。
+    -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.1" />
+  </ItemGroup>
+
 </Project>
