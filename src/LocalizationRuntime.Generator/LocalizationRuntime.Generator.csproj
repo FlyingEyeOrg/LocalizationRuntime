@@ -8,7 +8,12 @@
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <PackageId>LocalizationRuntime.Generator</PackageId>
+    <Title>LocalizationRuntime.Generator</Title>
     <Description>LocalizationRuntime 的 Roslyn 增量生成器：把 Localization/*.json 编译成常量数组。</Description>
+    <PackageTags>localization;i18n;l10n;culture;source-generator;analyzer</PackageTags>
+    <PackageProjectUrl>https://github.com/FlyingEyeOrg/LocalizationRuntime</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <DevelopmentDependency>true</DevelopmentDependency>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <!-- 分析器不能打 Nullable 元数据以外的花样，保持最保守。 -->
@@ -22,6 +27,10 @@
   <ItemGroup>
     <!-- 诊断规则的发布跟踪：RS2008 要求规则 ID 一经发布即冻结。 -->
     <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" Link="README.md" />
   </ItemGroup>
 
   <ItemGroup>

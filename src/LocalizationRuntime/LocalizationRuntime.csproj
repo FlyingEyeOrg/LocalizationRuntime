@@ -5,9 +5,19 @@
     <AssemblyName>LocalizationRuntime</AssemblyName>
     <RootNamespace>LocalizationRuntime</RootNamespace>
     <PackageId>LocalizationRuntime</PackageId>
+    <Title>LocalizationRuntime</Title>
     <Description>编译期固化多语言资源的 .NET 本地化运行时：运行时零文件 IO，按 CultureInfo 链回退取值。</Description>
     <PackageTags>localization;i18n;l10n;culture;source-generator</PackageTags>
+    <PackageProjectUrl>https://github.com/FlyingEyeOrg/LocalizationRuntime</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" Link="README.md" />
+  </ItemGroup>
 
   <ItemGroup>
     <!--

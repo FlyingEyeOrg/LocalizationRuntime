@@ -1,0 +1,126 @@
+name: Publish NuGet
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      package_version:
+        description: "手动发布的包版本，例如 0.2.0；留空时使用 Directory.Build.props 里的 Version"
+        required: false
+        type: string
+
+# NuGet 的 Trusted Publishing 走 OIDC，需要 id-token: write 才能换取临时 API Key。
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-nuget-${{ github.ref }}-${{ inputs.package_version }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Pack and publish
+    runs-on: windows-latest
+    # 必须与 NuGet.org 上信任策略里填的环境名一致。
+    environment: production
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Determine package version
+        id: version
+        shell: pwsh
+        run: |
+          function Get-Version {
+              [xml]$props = Get-Content "Directory.Build.props"
+              return [string]$props.Project.PropertyGroup.Version
+          }
+
+          $override = "${{ inputs.package_version }}".Trim()
+          $version = if ($override) { $override } else { Get-Version }
+
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
+              throw "无效的 NuGet 版本：$version"
+          }
+
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Output "package version = $version"
+
+      - name: Restore
+        run: dotnet restore LocalizationRuntime.sln
+
+      - name: Build
+        run: dotnet build LocalizationRuntime.sln -c Release --no-restore -p:ContinuousIntegrationBuild=true
+
+      # 本机 VSTest testhost 跑不起来，仓库自带一个不依赖它的执行器；CI 上同样用它更稳。
+      - name: Test
+        run: dotnet run --project tests/LocalizationRuntime.Tests.Runner -c Release --no-build
+
+      - name: Pack LocalizationRuntime
+        run: >
+          dotnet pack src/LocalizationRuntime/LocalizationRuntime.csproj
+          -c Release --no-build --no-restore -o artifacts
+          -p:PackageVersion=${{ steps.version.outputs.version }}
+          -p:ContinuousIntegrationBuild=true
+
+      - name: Pack LocalizationRuntime.Generator
+        run: >
+          dotnet pack src/LocalizationRuntime.Generator/LocalizationRuntime.Generator.csproj
+          -c Release --no-build --no-restore -o artifacts
+          -p:PackageVersion=${{ steps.version.outputs.version }}
+          -p:ContinuousIntegrationBuild=true
+
+      - name: Upload NuGet packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: LocalizationRuntime-${{ steps.version.outputs.version }}
+          path: |
+            artifacts/*.nupkg
+            artifacts/*.snupkg
+          if-no-files-found: error
+
+      # 用 OIDC 换取一次性 API Key，不需要在仓库里存长期密钥。
+      - name: Login to NuGet.org with OIDC
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: UnknowName
+
+      - name: Push to NuGet.org
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $packages = @("LocalizationRuntime", "LocalizationRuntime.Generator")
+
+          foreach ($name in $packages) {
+              $nupkg = "artifacts/$name.$version.nupkg"
+              if (-not (Test-Path $nupkg)) { throw "找不到打包产物：$nupkg" }
+
+              dotnet nuget push $nupkg `
+                --source "https://api.nuget.org/v3/index.json" `
+                --api-key $env:NUGET_API_KEY `
+                --skip-duplicate
+              if ($LASTEXITCODE -ne 0) { throw "$name $version 推送失败（退出码 $LASTEXITCODE）" }
+
+              # 符号包要与主包分开推，且必须在主包之后。
+              $snupkg = "artifacts/$name.$version.snupkg"
+              if (Test-Path $snupkg) {
+                  dotnet nuget push $snupkg `
+                    --source "https://api.nuget.org/v3/index.json" `
+                    --api-key $env:NUGET_API_KEY `
+                    --skip-duplicate
+                  if ($LASTEXITCODE -ne 0) { throw "$name $version 符号包推送失败（退出码 $LASTEXITCODE）" }
+              }
+          }
