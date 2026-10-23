@@ -238,6 +238,10 @@ namespace LocalizationRuntime.Tests
             Assert.All(containerIds, v => Assert.True(v >= TextCount));
         }
 
+        /// <summary>
+        /// 叶子都能取到文本；容器 id 一律抛 InvalidOperationException——
+        /// 它们不是越界，而是"合法但没有文本"，异常类型要能区分这两种错误。
+        /// </summary>
         [Fact]
         public void EveryLeafIdIsReadableAndEveryContainerIdIsNot()
         {
@@ -255,7 +259,9 @@ namespace LocalizationRuntime.Tests
 
             foreach (var id in ids.Where(v => v >= TextCount))
             {
-                Assert.Throws<ArgumentOutOfRangeException>(() => l.Get(id));
+                // 容器 id 有子节点，因此必须报"用法错误"而不是"越界"
+                Assert.NotEmpty(l.GetChildren(id));
+                Assert.Throws<InvalidOperationException>(() => l.Get(id));
             }
         }
 

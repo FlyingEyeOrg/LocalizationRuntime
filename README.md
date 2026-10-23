@@ -116,18 +116,31 @@ internal sealed class GeneratedCatalog  // 每语言一个 string?[]（未翻译
 
 ## 取值
 
-两个区间，互不重叠：
+id 分三类，互不重叠：
 
-| id 区间 | 含义 | `Get(id)` |
+| id | 含义 | `Get(id)` |
 |---|---|---|
 | `0 .. LocalizationIds.TextCount-1` | 叶子（具体文本） | 返回字符串 |
-| `>= LocalizationIds.TextCount` | 容器（数组 / 对象） | `ArgumentOutOfRangeException` |
+| `>= LocalizationIds.TextCount` | 容器（数组 / 对象） | `InvalidOperationException` |
+| 不在上述任一区间 | 不存在的 id | `ArgumentOutOfRangeException` |
 
-容器没有文本，所以传给 `Get` 会抛异常——这能在编译期挡住「把数组当字符串用」。
+容器没有文本，所以传给 `Get` 会抛异常——这能挡住「把数组当字符串用」。
+两种失败刻意用不同异常，避免混淆：
 
 ```csharp
 string title = localizer.Get(LocalizationIds.AppObject.Title);   // 单值
+
+localizer.Get(LocalizationIds.Menus);
+// InvalidOperationException: id 21 是容器（数组 / 对象），没有对应的文本。
+//   取容器请用 GetChildren / GetValues / GetAllValues。
+
+localizer.Get(9999);
+// ArgumentOutOfRangeException: 键 id 不存在：叶子 id 的有效区间是 0..TextCount-1，
+//   更大的 id 必须是容器。
 ```
+
+前者是用法错误（id 合法，只是没有文本），后者是真的不存在——据此可以直接判断
+是自己调用写错了，还是传进来的数字来路不明。
 
 ## 容器：取整个数组
 

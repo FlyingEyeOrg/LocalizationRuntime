@@ -100,19 +100,34 @@ namespace LocalizationRuntime
         }
 
         /// <summary>
-        /// 按编译期键 id 取值。热路径：一次快照读 + 一次数组索引，零分配、无锁。
+        /// 按编译期 id 取当前语言的文本。热路径：一次快照读 + 一次数组索引，零分配、无锁。
+        ///
+        /// 只有叶子有文本。传入容器 id 会抛 <see cref="InvalidOperationException"/>：
+        /// 那是用法错误而非越界——该 id 是合法的常量，只是代表数组或对象，
+        /// 应该改用 <see cref="GetChildren"/> / <see cref="GetValues"/> / <see cref="GetAllValues"/>。
+        /// 传入完全不存在于 id 空间的 id 才会抛 <see cref="ArgumentOutOfRangeException"/>。
         /// </summary>
         public string Get(int id)
         {
             var values = Volatile.Read(ref _snapshot).Values;
-            if ((uint)id >= (uint)values.Length)
+            if ((uint)id < (uint)values.Length)
             {
-                throw new ArgumentOutOfRangeException(
-                    nameof(id), id,
-                    "键 id 超出范围：该 id 是容器（数组 / 对象）或越界，容器请用 GetChildren / GetValues。");
+                return values[id];
             }
 
-            return values[id];
+            // 落在叶子区间之外，但确有子节点 → 这是一个真实的容器 id。
+            // （生成器不允许空容器，见 LR1010，所以"有子节点"即可判定为容器。）
+            if (_catalog.GetChildren(id).Length > 0)
+            {
+                throw new InvalidOperationException(
+                    "id " + id + " 是容器（数组 / 对象），没有对应的文本。" +
+                    "取容器请用 GetChildren / GetValues / GetAllValues。");
+            }
+
+            throw new ArgumentOutOfRangeException(
+                nameof(id), id,
+                "键 id 不存在：叶子 id 的有效区间是 0.." +
+                (values.Length - 1) + "，更大的 id 必须是容器。");
         }
 
 

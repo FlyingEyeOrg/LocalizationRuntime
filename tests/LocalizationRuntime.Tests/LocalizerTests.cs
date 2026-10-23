@@ -122,12 +122,27 @@ namespace LocalizationRuntime.Tests
         }
 
         [Fact]
-        public void Get_OutOfRangeId_Throws()
+        public void Get_OutOfRangeId_ThrowsArgumentOutOfRange()
         {
             var l = Use(CreateCatalog(), "en-US");
 
+            // 负数和远超 id 空间的数字：确实越界
             Assert.Throws<ArgumentOutOfRangeException>(() => l.Get(-1));
             Assert.Throws<ArgumentOutOfRangeException>(() => l.Get(99));
+        }
+
+        [Fact]
+        public void Get_ContainerId_ThrowsInvalidOperation()
+        {
+            var l = Use(CreateCatalog(), "en-US");
+
+            // FakeCatalog 的 TextCount 是 5；5=Tabs(数组), 6=About(对象) 都是容器。
+            // 这不是越界，而是"合法 id 但没有文本"，异常类型要能把两件事分开。
+            Assert.NotEmpty(l.GetChildren(5));
+            Assert.NotEmpty(l.GetChildren(6));
+
+            Assert.Throws<InvalidOperationException>(() => l.Get(5));
+            Assert.Throws<InvalidOperationException>(() => l.Get(6));
         }
 
         [Fact]
