@@ -35,10 +35,11 @@ namespace LocalizationRuntime.Tests
 
         public IReadOnlyList<string> CultureNames { get; }
 
-        public IReadOnlyList<string> Keys { get; } = new[]
+        /// <summary>叶子 id 个数：Hello, Tabs.0, Tabs.1, About.Title, About.Body。</summary>
+        public int TextCount
         {
-            "Hello", "Tabs.0", "Tabs.1", "About.Title", "About.Body"
-        };
+            get { return 5; }
+        }
 
         /// <summary>
         /// 键 id：0=Hello, 1=Tabs.0, 2=Tabs.1, 3=About.Title, 4=About.Body。
@@ -96,22 +97,7 @@ namespace LocalizationRuntime.Tests
             Assert.Equal("One", l.Get(1));
         }
 
-        [Fact]
-        public void GetByKey_ReturnsSameValueAsById()
-        {
-            var l = Use(CreateCatalog(), "en-US");
 
-            Assert.Equal(l.Get(0), l.Get("Hello"));
-            Assert.Equal("Two", l.Get("Tabs.1"));
-        }
-
-        [Fact]
-        public void GetByKey_UnknownKey_ReturnsKeyItself()
-        {
-            var l = Use(CreateCatalog(), "en-US");
-
-            Assert.Equal("No.Such.Key", l.Get("No.Such.Key"));
-        }
 
         [Fact]
         public void Get_FallsBackPerKey_ToDefaultCulture()
@@ -369,6 +355,10 @@ namespace LocalizationRuntime.Tests
         }
     }
 }
+
+
+
+
 
 
 

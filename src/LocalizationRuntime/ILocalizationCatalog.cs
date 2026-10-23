@@ -14,8 +14,11 @@ namespace LocalizationRuntime
         /// <summary>本次编译包含的语言名，按 Ordinal 升序。</summary>
         IReadOnlyList<string> CultureNames { get; }
 
-        /// <summary>全部键的点分路径。下标即键 id，顺序与每张表一致。</summary>
-        IReadOnlyList<string> Keys { get; }
+        /// <summary>
+        /// 叶子 id 的个数，也就是可取值的 id 区间 <c>0 .. TextCount-1</c> 的上界。
+        /// 大于等于它的 id 是容器（数组 / 对象），不能直接取值。
+        /// </summary>
+        int TextCount { get; }
 
         /// <summary>
         /// 取某个容器 id 的直接子 id（按数组/对象中的原始顺序）。
@@ -30,9 +33,10 @@ namespace LocalizationRuntime
         int[] GetChildren(int id);
 
         /// <summary>
-        /// 取某语言的原始表，长度等于 <see cref="Keys"/> 的长度，缺键位置为 null。
+        /// 取某语言的原始表，长度等于 <see cref="TextCount"/>，缺键位置为 null。
         /// 该语言不存在时返回 null。返回的数组只读，调用方不得修改。
         /// </summary>
         string?[]? GetTable(string cultureName);
     }
 }
+

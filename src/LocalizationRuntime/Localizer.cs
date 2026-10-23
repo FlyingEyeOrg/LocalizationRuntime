@@ -8,7 +8,7 @@ namespace LocalizationRuntime
     /// <summary>
     /// 本地化入口：持有当前语言，按键取值。
     ///
-    /// 两件事：用 <see cref="Get(int)"/> / <see cref="Get(string)"/> 取当前语言的值，
+    /// 两件事：用 <see cref="Get(int)"/> 取当前语言的值，
     /// 用 <see cref="SetCulture(CultureInfo)"/> 切换语言。切换后再次取值自然得到新语言的值。
     ///
     /// 数据通过构造函数注入——生成器在目标程序集里产出的 <c>Catalog.Instance</c>：
@@ -38,7 +38,6 @@ namespace LocalizationRuntime
         }
 
         private readonly ILocalizationCatalog _catalog;
-        private readonly Dictionary<string, int> _index;
         private readonly HashSet<string> _supported;
         private readonly Dictionary<string, string[]> _resolved = new Dictionary<string, string[]>(StringComparer.Ordinal);
         private readonly object _gate = new object();
@@ -55,12 +54,6 @@ namespace LocalizationRuntime
         {
             _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
 
-            var keys = catalog.Keys;
-            _index = new Dictionary<string, int>(keys.Count, StringComparer.Ordinal);
-            for (var i = 0; i < keys.Count; i++)
-            {
-                _index[keys[i]] = i;
-            }
 
             // 把每种受支持语言及其整条 Parent 链都登记进去，
             // 这样判断"是否受支持"退化为一次哈希查找，不必在 SetCulture 里走链。
@@ -122,20 +115,6 @@ namespace LocalizationRuntime
             return values[id];
         }
 
-        /// <summary>
-        /// 按点分键取值（如 <c>"App.Title"</c>），供拿不到编译期 id 的场景使用。
-        /// 键不存在时返回键本身。
-        /// </summary>
-        public string Get(string key)
-        {
-            if (key == null)
-            {
-                throw new ArgumentNullException(nameof(key));
-            }
-
-            int id;
-            return _index.TryGetValue(key, out id) ? Get(id) : key;
-        }
 
         // ───────────────────────── 容器（数组 / 对象）─────────────────────────
 
@@ -303,8 +282,7 @@ namespace LocalizationRuntime
         /// </summary>
         private string[] BuildResolved(string cultureName)
         {
-            var keys = _catalog.Keys;
-            var length = keys.Count;
+            var length = _catalog.TextCount;
 
             // 基语言本身：补齐空槽即可，无需逐键走链
             if (string.Equals(cultureName, _catalog.DefaultCultureName, StringComparison.OrdinalIgnoreCase))
@@ -343,7 +321,7 @@ namespace LocalizationRuntime
                     }
                 }
 
-                result[id] = value ?? keys[id];
+                result[id] = value ?? string.Empty;
             }
 
             return result;
@@ -353,13 +331,13 @@ namespace LocalizationRuntime
         private string[] Materialize(string?[]? source, int length)
         {
             var result = new string[length];
-            var keys = _catalog.Keys;
 
             if (source == null)
             {
+                // 整张表都缺失：全部填空串，热路径不用再判 null。
                 for (var i = 0; i < length; i++)
                 {
-                    result[i] = keys[i];
+                    result[i] = string.Empty;
                 }
 
                 return result;
@@ -368,12 +346,12 @@ namespace LocalizationRuntime
             var copy = Math.Min(length, source.Length);
             for (var i = 0; i < copy; i++)
             {
-                result[i] = source[i] ?? keys[i];
+                result[i] = source[i] ?? string.Empty;
             }
 
             for (var i = copy; i < length; i++)
             {
-                result[i] = keys[i];
+                result[i] = string.Empty;
             }
 
             return result;
@@ -412,3 +390,7 @@ namespace LocalizationRuntime
         }
     }
 }
+
+
+
+

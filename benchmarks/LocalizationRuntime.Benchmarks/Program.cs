@@ -26,7 +26,7 @@ namespace LocalizationRuntime.Benchmarks
             Console.WriteLine("首次访问 catalog + 建表: " +
                               swStartup.Elapsed.TotalMilliseconds.ToString("N2", CultureInfo.InvariantCulture) + " ms");
             Console.WriteLine("语言数量    : " + catalog.CultureNames.Count);
-            Console.WriteLine("键数量      : " + catalog.Keys.Count);
+            Console.WriteLine("叶子数      : " + LocalizationIds.TextCount);
             Console.WriteLine();
 
             // 首次解析一张未缓存的语言表（模拟切到从未用过的语言）
@@ -42,10 +42,8 @@ namespace LocalizationRuntime.Benchmarks
 
             // 预热，避免把 JIT 时间算进去
             RunGetById(localizer, 1_000_000);
-            RunGetByKey(localizer, 200_000);
 
             Measure("Get(id) 命中", Iterations, () => RunGetById(localizer, Iterations));
-            Measure("Get(string) 命中", Iterations / 4, () => RunGetByKey(localizer, Iterations / 4));
 
             var switches = 200_000;
             var cultures = new[]
@@ -80,16 +78,6 @@ namespace LocalizationRuntime.Benchmarks
             Sink = sink;
         }
 
-        private static void RunGetByKey(Localizer localizer, int n)
-        {
-            var sink = 0;
-            for (var i = 0; i < n; i++)
-            {
-                sink ^= localizer.Get("Common.Key1").Length;
-            }
-
-            Sink = sink;
-        }
 
         private static void Measure(string name, long iterations, Action body)
         {
@@ -115,6 +103,9 @@ namespace LocalizationRuntime.Benchmarks
         private static int Sink;
     }
 }
+
+
+
 
 
 

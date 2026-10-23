@@ -84,18 +84,18 @@ namespace LocalizationRuntime.Tests
         public void EveryLeafIdIsNonEmptyInEveryCulture()
         {
             var l = new Localizer(Catalog.Instance);
-            var leafCount = Catalog.Instance.Keys.Count;
+            var TextCount = LocalizationIds.TextCount;
 
             foreach (var culture in Cultures)
             {
                 var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo(culture));
 
-                for (var id = 0; id < leafCount; id++)
+                for (var id = 0; id < TextCount; id++)
                 {
                     var value = localizer.Get(id);
                     Assert.False(
                         string.IsNullOrEmpty(value),
-                        culture + " 的 id=" + id + "（键 " + Catalog.Instance.Keys[id] + "）取到空值");
+                        culture + " 的 id=" + id + " 取到空值");
                 }
             }
         }
@@ -107,8 +107,6 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void EveryCultureMatchesItsOwnJsonFile()
         {
-            var l = new Localizer(Catalog.Instance);
-            var keys = Catalog.Instance.Keys;
             var problems = new List<string>();
 
             foreach (var culture in Cultures)
@@ -116,21 +114,24 @@ namespace LocalizationRuntime.Tests
                 var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo(culture));
                 var expected = Flatten(culture);
 
-                for (var id = 0; id < keys.Count; id++)
+                // 键路径不再对外暴露，因此按值集合对照：
+                // 该语言下每个 id 取到的值，必须正好等于 JSON 里全部叶子值的多重集合。
+                var got = new string[LocalizationIds.TextCount];
+                for (var id = 0; id < got.Length; id++)
                 {
-                    string? want;
-                    if (!expected.TryGetValue(keys[id], out want))
-                    {
-                        problems.Add(culture + " 缺少键 " + keys[id]);
-                        continue;
-                    }
+                    got[id] = localizer.Get(id);
+                }
 
-                    var got = localizer.Get(id);
-                    if (!string.Equals(got, want, StringComparison.Ordinal))
-                    {
-                        problems.Add(
-                            culture + " 的 " + keys[id] + "（id=" + id + "）期望 '" + want + "' 实际 '" + got + "'");
-                    }
+                var want = expected.Values.OrderBy(v => v, StringComparer.Ordinal).ToArray();
+                var actual = got.OrderBy(v => v, StringComparer.Ordinal).ToArray();
+
+                if (!want.SequenceEqual(actual, StringComparer.Ordinal))
+                {
+                    problems.Add(
+                        culture + " 的值集合不符。缺少 [" +
+                        string.Join(", ", want.Except(actual, StringComparer.Ordinal)) +
+                        "] 多出 [" +
+                        string.Join(", ", actual.Except(want, StringComparer.Ordinal)) + "]");
                 }
             }
 
@@ -144,11 +145,11 @@ namespace LocalizationRuntime.Tests
         {
             var l = new Localizer(Catalog.Instance);
             // 测试资源里两种语言的值全部不同，所以每个 id 都必须变化。
-            var leafCount = Catalog.Instance.Keys.Count;
+            var TextCount = LocalizationIds.TextCount;
             var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
 
-            var before = new string[leafCount];
-            for (var id = 0; id < leafCount; id++)
+            var before = new string[TextCount];
+            for (var id = 0; id < TextCount; id++)
             {
                 before[id] = localizer.Get(id);
             }
@@ -156,11 +157,11 @@ namespace LocalizationRuntime.Tests
             l.SetCulture(CultureInfo.GetCultureInfo("en-US"));
 
             var unchanged = new List<string>();
-            for (var id = 0; id < leafCount; id++)
+            for (var id = 0; id < TextCount; id++)
             {
                 if (string.Equals(before[id], l.Get(id), StringComparison.Ordinal))
                 {
-                    unchanged.Add("id=" + id + " 键=" + Catalog.Instance.Keys[id]);
+                    unchanged.Add("id=" + id);
                 }
             }
 
@@ -173,12 +174,12 @@ namespace LocalizationRuntime.Tests
         public void UnknownCultureFallsBackToDefault()
         {
             var l = new Localizer(Catalog.Instance);
-            var leafCount = Catalog.Instance.Keys.Count;
+            var TextCount = LocalizationIds.TextCount;
 
             // 先记录基语言的实际值，再切到不受支持的 de-DE 对比。
             var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
-            var expected = new string[leafCount];
-            for (var id = 0; id < leafCount; id++)
+            var expected = new string[TextCount];
+            for (var id = 0; id < TextCount; id++)
             {
                 expected[id] = localizer.Get(id);
             }
@@ -186,7 +187,7 @@ namespace LocalizationRuntime.Tests
             // 不受支持的语言应落到基语言，CurrentCulture 与值的来源必须一致。
             Assert.Equal("zh-CN", l.CurrentCulture.Name);
 
-            for (var id = 0; id < leafCount; id++)
+            for (var id = 0; id < TextCount; id++)
             {
                 Assert.Equal(expected[id], l.Get(id));
             }
@@ -198,12 +199,12 @@ namespace LocalizationRuntime.Tests
             var l = new Localizer(Catalog.Instance);
             var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
 
-            var first = Enumerable.Range(0, Catalog.Instance.Keys.Count).Select(localizer.Get).ToArray();
+            var first = Enumerable.Range(0, LocalizationIds.TextCount).Select(localizer.Get).ToArray();
 
             localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
             localizer.SetCulture(CultureInfo.GetCultureInfo("zh-CN"));
 
-            var again = Enumerable.Range(0, Catalog.Instance.Keys.Count).Select(localizer.Get).ToArray();
+            var again = Enumerable.Range(0, LocalizationIds.TextCount).Select(localizer.Get).ToArray();
 
             Assert.Equal(first, again);
         }
@@ -218,7 +219,7 @@ namespace LocalizationRuntime.Tests
         public void ConstantTreeCoversEveryNonLeafNode()
         {
             var l = new Localizer(Catalog.Instance);
-            var leafCount = Catalog.Instance.Keys.Count;
+            var TextCount = LocalizationIds.TextCount;
 
             var json = File.ReadAllText(ResourcePath("zh-CN"));
             var nonLeaf = 0;
@@ -233,7 +234,7 @@ namespace LocalizationRuntime.Tests
 
             var total = CountConstants(typeof(LocalizationIds));
 
-            Assert.Equal(leafCount + nonLeaf, total);
+            Assert.Equal(TextCount + nonLeaf, total);
         }
 
         /// <summary>
@@ -277,6 +278,12 @@ namespace LocalizationRuntime.Tests
             {
                 if (f.FieldType == typeof(int) && f.IsLiteral)
                 {
+                    // TextCount 是元信息，不计入常量树。
+                    if (type == typeof(LocalizationIds) && f.Name == nameof(LocalizationIds.TextCount))
+                    {
+                        continue;
+                    }
+
                     n++;
                 }
             }
@@ -291,6 +298,10 @@ namespace LocalizationRuntime.Tests
         }
     }
 }
+
+
+
+
 
 
 

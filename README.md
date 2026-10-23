@@ -17,10 +17,13 @@ Localizer.GetAllValues(LocalizationIds.Matrix);               // ["A1", "A2", "B
 核心只有两件事：**按 id 取当前语言的值**，**设置当前语言**。
 
 ```csharp
-Localizer.Get(LocalizationIds.AppObject.Title);     // 编译期 id，最快
-Localizer.Get("App.Title");                         // 字符串 key
-Localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
+var localizer = new Localizer(Catalog.Instance);
+
+localizer.Get(LocalizationIds.AppObject.Title);     // 编译期 id，最快
+localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
 ```
+
+全部按 id 取值，字符串键路径不对外暴露——`LocalizationIds` 已经把每一条文本都编成了常量。
 
 没有通知、没有订阅、没有弱引用。切语言后再次取值自然就是新语言的值——
 谁需要刷新界面，谁负责在切语言后重新读取。
@@ -118,8 +121,8 @@ internal sealed class GeneratedCatalog  // 每语言一个 string?[]（缺键为
 
 | id 区间 | 含义 | `Get(id)` |
 |---|---|---|
-| `0 .. Keys.Count-1` | 叶子（具体文本） | 返回字符串 |
-| `>= Keys.Count` | 容器（数组 / 对象） | `ArgumentOutOfRangeException` |
+| `0 .. LocalizationIds.TextCount-1` | 叶子（具体文本） | 返回字符串 |
+| `>= LocalizationIds.TextCount` | 容器（数组 / 对象） | `ArgumentOutOfRangeException` |
 
 容器没有文本，所以传给 `Get` 会抛异常——这能在编译期挡住「把数组当字符串用」。
 
@@ -329,6 +332,7 @@ trim / 单文件发布都安全。启动只加载当前语言，切语言时才�
 这会让产品失去运行时切换语言的能力，也失去按系统 culture 自动探测的能力——
 用户装到日语系统上只能看到中文。除非走多语言安装包路线，否则不该这么做。
 安装包层面按语言分发 dll 是另一回事，与库无关。
+
 
 
 

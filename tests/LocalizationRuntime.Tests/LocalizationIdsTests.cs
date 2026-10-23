@@ -29,6 +29,12 @@ namespace LocalizationRuntime.Tests
                     continue;
                 }
 
+                // TextCount 是元信息（叶子总数），不是键 id，不参与 id 树统计。
+                if (prefix.Length == 0 && field.Name == nameof(LocalizationIds.TextCount))
+                {
+                    continue;
+                }
+
                 result[prefix + field.Name] = (int)field.GetRawConstantValue()!;
             }
 
@@ -53,15 +59,15 @@ namespace LocalizationRuntime.Tests
         {
             var l = new Localizer(Catalog.Instance);
             var catalog = Catalog.Instance;
-            var leafCount = catalog.Keys.Count;
+            var TextCount = LocalizationIds.TextCount;
 
             var all = AllIds();
 
-            // 叶子 id 必须是 0..leafCount-1 且不重复
-            var leaves = all.Where(p => p.Value < leafCount).Select(p => p.Value).OrderBy(v => v).ToArray();
+            // 叶子 id 必须是 0..TextCount-1 且不重复
+            var leaves = all.Where(p => p.Value < TextCount).Select(p => p.Value).OrderBy(v => v).ToArray();
 
-            Assert.Equal(leafCount, leaves.Length);
-            for (var i = 0; i < leafCount; i++)
+            Assert.Equal(TextCount, leaves.Length);
+            for (var i = 0; i < TextCount; i++)
             {
                 Assert.Equal(i, leaves[i]);
             }
@@ -71,10 +77,10 @@ namespace LocalizationRuntime.Tests
         public void ContainerIds_AreUniqueAndDisjointFromLeaves()
         {
             var l = new Localizer(Catalog.Instance);
-            var leafCount = Catalog.Instance.Keys.Count;
+            var TextCount = LocalizationIds.TextCount;
 
             var containers = AllIds()
-                .Where(p => p.Value >= leafCount)
+                .Where(p => p.Value >= TextCount)
                 .ToDictionary(p => p.Key, p => p.Value);
 
             // 容器 id 不能重复
@@ -124,21 +130,21 @@ namespace LocalizationRuntime.Tests
         public void ContainerIdsAreAllocatedOnce_NoDuplicatedSpans()
         {
             var l = new Localizer(Catalog.Instance);
-            var leafCount = Catalog.Instance.Keys.Count;
+            var TextCount = LocalizationIds.TextCount;
             var all = AllIds();
 
             var containers = all
-                .Where(p => p.Value >= leafCount)
+                .Where(p => p.Value >= TextCount)
                 .Select(p => p.Value)
                 .OrderBy(v => v)
                 .ToArray();
 
-            // 容器 id 必须从 leafCount 开始连续排列，不能有跳号
+            // 容器 id 必须从 TextCount 开始连续排列，不能有跳号
             for (var i = 0; i < containers.Length; i++)
             {
                 Assert.True(
-                    containers[i] == leafCount + i,
-                    "容器 id 不连续：第 " + i + " 个是 " + containers[i] + "，期望 " + (leafCount + i));
+                    containers[i] == TextCount + i,
+                    "容器 id 不连续：第 " + i + " 个是 " + containers[i] + "，期望 " + (TextCount + i));
             }
         }
 
@@ -152,8 +158,8 @@ namespace LocalizationRuntime.Tests
             var byId = ids.ToDictionary(p => p.Value, p => p.Key);
 
             // 每个叶子 id 必须能反查到唯一的键路径（容器 id 除外）
-            var leafCount = catalog.Keys.Count;
-            for (var i = 0; i < leafCount; i++)
+            var TextCount = LocalizationIds.TextCount;
+            for (var i = 0; i < TextCount; i++)
             {
                 Assert.True(byId.ContainsKey(i), "id " + i + " 没有对应的常量");
             }
@@ -163,11 +169,11 @@ namespace LocalizationRuntime.Tests
         public void ContainerId_IsNotReadableAsText()
         {
             var l = new Localizer(Catalog.Instance);
-            var leafCount = Catalog.Instance.Keys.Count;
+            var TextCount = LocalizationIds.TextCount;
             var localizer = new Localizer(Catalog.Instance);
 
             // 容器 id 落在叶子区间之外，取值必须抛异常，从而挡住误用
-            var containerId = AllIds().Values.Where(v => v >= leafCount).DefaultIfEmpty(-1).Max();
+            var containerId = AllIds().Values.Where(v => v >= TextCount).DefaultIfEmpty(-1).Max();
 
             if (containerId < 0)
             {
@@ -184,10 +190,10 @@ namespace LocalizationRuntime.Tests
         {
             var l = new Localizer(Catalog.Instance);
             var localizer = new Localizer(Catalog.Instance);
-            var leafCount = Catalog.Instance.Keys.Count;
+            var TextCount = LocalizationIds.TextCount;
 
             // 每个叶子 id 都必须取到非空字符串
-            for (var i = 0; i < leafCount; i++)
+            for (var i = 0; i < TextCount; i++)
             {
                 var value = l.Get(i);
                 Assert.False(string.IsNullOrEmpty(value), "id " + i + " 取到空值");
@@ -209,6 +215,10 @@ namespace LocalizationRuntime.Tests
         }
     }
 }
+
+
+
+
 
 
 

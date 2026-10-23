@@ -396,6 +396,11 @@ namespace LocalizationRuntime.Generator
             sb.AppendLine("/// <summary>编译期键 id。由生成器产出，不要手写。</summary>");
             sb.AppendLine("public static class LocalizationIds");
             sb.AppendLine("{");
+            sb.AppendLine("    /// <summary>叶子 id 的个数：0..TextCount-1 可取文本，再往上是容器。</summary>");
+            sb.Append("    public const int TextCount = ");
+            sb.Append(model.Keys.Length.ToString(CultureInfo.InvariantCulture));
+            sb.AppendLine(";");
+            sb.AppendLine();
 
             var root = BuildKeyTree(model);
 
@@ -726,17 +731,6 @@ namespace LocalizationRuntime.Generator
             sb.AppendLine();
             sb.AppendLine("internal sealed class GeneratedCatalog : global::LocalizationRuntime.ILocalizationCatalog");
             sb.AppendLine("{");
-            sb.AppendLine("    private static readonly string[] AllKeys =");
-            sb.AppendLine("    {");
-            foreach (var key in model.Keys)
-            {
-                sb.Append("        ");
-                sb.Append(Literal(key.Path));
-                sb.AppendLine(",");
-            }
-
-            sb.AppendLine("    };");
-            sb.AppendLine();
             sb.Append("    private static readonly string[] AllCultures = { ");
             for (var i = 0; i < model.Cultures.Length; i++)
             {
@@ -754,7 +748,9 @@ namespace LocalizationRuntime.Generator
             sb.Append(Literal(model.DefaultCulture));
             sb.AppendLine(";");
             sb.AppendLine();
-            sb.AppendLine("    public global::System.Collections.Generic.IReadOnlyList<string> Keys => AllKeys;");
+            sb.Append("    public int TextCount => ");
+            sb.Append(model.Keys.Length.ToString(CultureInfo.InvariantCulture));
+            sb.AppendLine(";");
             sb.AppendLine();
             sb.AppendLine("    public global::System.Collections.Generic.IReadOnlyList<string> CultureNames => AllCultures;");
             sb.AppendLine();
@@ -1118,3 +1114,4 @@ namespace LocalizationRuntime.Generator
         public List<ResourceFlattener.Entry> Entries { get; }
     }
 }
+

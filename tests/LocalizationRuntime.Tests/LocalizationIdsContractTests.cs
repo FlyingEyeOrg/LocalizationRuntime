@@ -44,6 +44,12 @@ namespace LocalizationRuntime.Tests
             {
                 if (field.FieldType == typeof(int) && field.IsLiteral)
                 {
+                    // TextCount 是元信息，不是键 id。
+                    if (type == typeof(LocalizationIds) && field.Name == nameof(LocalizationIds.TextCount))
+                    {
+                        continue;
+                    }
+
                     node.Constants.Add(new KeyValuePair<string, int>(
                         field.Name, (int)field.GetRawConstantValue()!));
                 }
@@ -210,21 +216,21 @@ namespace LocalizationRuntime.Tests
         public void LeafIdsComeFirstThenContainerIds()
         {
             var l = new Localizer(Catalog.Instance);
-            var leafCount = Catalog.Instance.Keys.Count;
+            var TextCount = LocalizationIds.TextCount;
 
             var ids = new List<int>();
             Walk(Root(), node => ids.AddRange(node.Constants.Select(c => c.Value)));
 
-            // 0..leafCount-1 全部被使用
+            // 0..TextCount-1 全部被使用
             var used = new HashSet<int>(ids);
-            for (var i = 0; i < leafCount; i++)
+            for (var i = 0; i < TextCount; i++)
             {
                 Assert.True(used.Contains(i), "叶子 id " + i + " 没有被任何常量占用");
             }
 
-            // 容器 id 全部 >= leafCount
-            var containerIds = ids.Where(v => v >= leafCount).ToArray();
-            Assert.All(containerIds, v => Assert.True(v >= leafCount));
+            // 容器 id 全部 >= TextCount
+            var containerIds = ids.Where(v => v >= TextCount).ToArray();
+            Assert.All(containerIds, v => Assert.True(v >= TextCount));
         }
 
         [Fact]
@@ -232,9 +238,9 @@ namespace LocalizationRuntime.Tests
         {
             var l = new Localizer(Catalog.Instance);
             var localizer = new Localizer(Catalog.Instance);
-            var leafCount = Catalog.Instance.Keys.Count;
+            var TextCount = LocalizationIds.TextCount;
 
-            for (var i = 0; i < leafCount; i++)
+            for (var i = 0; i < TextCount; i++)
             {
                 Assert.False(string.IsNullOrEmpty(l.Get(i)), "叶子 " + i + " 取到空值");
             }
@@ -242,7 +248,7 @@ namespace LocalizationRuntime.Tests
             var ids = new HashSet<int>();
             Walk(Root(), node => { foreach (var c in node.Constants) ids.Add(c.Value); });
 
-            foreach (var id in ids.Where(v => v >= leafCount))
+            foreach (var id in ids.Where(v => v >= TextCount))
             {
                 Assert.Throws<ArgumentOutOfRangeException>(() => l.Get(id));
             }
@@ -281,6 +287,9 @@ namespace LocalizationRuntime.Tests
         }
     }
 }
+
+
+
 
 
 

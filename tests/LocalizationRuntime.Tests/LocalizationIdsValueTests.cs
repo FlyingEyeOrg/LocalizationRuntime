@@ -168,12 +168,12 @@ namespace LocalizationRuntime.Tests
         public void AllLeafValuesAreGloballyUnique()
         {
             var l = Zh();
-            var leafCount = Catalog.Instance.Keys.Count;
+            var TextCount = LocalizationIds.TextCount;
 
             var seen = new Dictionary<string, int>(StringComparer.Ordinal);
             var duplicates = new List<string>();
 
-            for (var id = 0; id < leafCount; id++)
+            for (var id = 0; id < TextCount; id++)
             {
                 var value = l.Get(id);
 
@@ -201,16 +201,20 @@ namespace LocalizationRuntime.Tests
         /// 新增/删除的键是有意的。真正的正确性由 LocalizationJsonParityTests
         /// 全量校验，那条不需要维护任何数字。
         /// </summary>
-        private const int ExpectedLeafCount = 33;
+        private const int ExpectedTextCount = 33;
 
         [Fact]
-        public void LeafCountMatchesResource()
+        public void TextCountMatchesResource()
         {
             var l = Zh();
-            Assert.Equal(ExpectedLeafCount, Catalog.Instance.Keys.Count);
+            Assert.Equal(ExpectedTextCount, LocalizationIds.TextCount);
         }
     }
 }
+
+
+
+
 
 
 

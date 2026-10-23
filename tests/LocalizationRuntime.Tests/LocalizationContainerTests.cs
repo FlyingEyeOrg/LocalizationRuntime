@@ -231,10 +231,10 @@ namespace LocalizationRuntime.Tests
             {
                 foreach (var childId in l.GetChildren(arrayId))
                 {
-                    Assert.NotEqual(0, l.GetChildCount(childId) + (childId < Catalog.Instance.Keys.Count ? 1 : 0));
+                    Assert.NotEqual(0, l.GetChildCount(childId) + (childId < LocalizationIds.TextCount ? 1 : 0));
 
                     // 子 id 要么可取文本，要么可继续展开，不能两者皆无
-                    var isLeaf = childId < Catalog.Instance.Keys.Count;
+                    var isLeaf = childId < LocalizationIds.TextCount;
                     if (isLeaf)
                     {
                         Assert.False(string.IsNullOrEmpty(l.Get(childId)));
@@ -276,7 +276,7 @@ namespace LocalizationRuntime.Tests
         }
 
         [Fact]
-        public void FlattenedCount_MatchesLeafCountOfSubtree()
+        public void FlattenedCount_MatchesTextCountOfSubtree()
         {
             var l = Zh();
 

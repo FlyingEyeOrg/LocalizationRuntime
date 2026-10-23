@@ -21,7 +21,7 @@ namespace LocalizationRuntime.Sample
 
             Console.WriteLine("系统探测语言: " + localizer.CurrentCulture.Name);
             Console.WriteLine("支持的语言  : " + string.Join(", ", Catalog.Instance.CultureNames));
-            Console.WriteLine("键总数      : " + Catalog.Instance.Keys.Count);
+            Console.WriteLine("叶子数      : " + LocalizationIds.TextCount);
             Console.WriteLine();
 
             Dump(localizer, "初次加载");
@@ -116,4 +116,6 @@ namespace LocalizationRuntime.Sample
         }
     }
 }
+
+
 

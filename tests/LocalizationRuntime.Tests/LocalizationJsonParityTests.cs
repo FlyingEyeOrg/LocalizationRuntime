@@ -79,24 +79,29 @@ namespace LocalizationRuntime.Tests
         // ─────────────────────────── id 树侧 ───────────────────────────
 
         /// <summary>
-        /// 从根开始，用容器的子 id 遍历整棵 id 树，收集「路径 → 叶子 id」。
+        /// 建立「JSON 路径 → id」的反查表。
         ///
-        /// 路径怎么来：子 id 若小于 Keys.Count 是叶子，否则是容器。
-        /// 容器继续展开；数组/对象的区分不需要知道——只要路径拼得起来即可。
-        /// 这里用「父容器在 Keys 中的路径 + 子序号」不成立（对象成员没有下标），
-        /// 因此改为直接依赖 Catalog.Keys 提供的权威路径。
+        /// Catalog 不再暴露键路径（既然全部用 id，字符串路径就是多余的），
+        /// 因此这里换一种方式：测试资源里每个叶子值都是全局唯一的，
+        /// 于是可以先用 id 取值、再用值反查它在 JSON 中的路径。
         /// </summary>
         private static Dictionary<string, int> FlattenIds()
         {
             var localizer = new Localizer(Catalog.Instance);
-            var keys = Catalog.Instance.Keys;
+
+            // 值 → JSON 路径
+            var byValue = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var pair in FlattenJson("zh-CN"))
+            {
+                byValue[pair.Value] = pair.Key;
+            }
 
             var result = new Dictionary<string, int>(StringComparer.Ordinal);
 
-            // 叶子 id 就是 Keys 的下标；这里先把全部叶子登记进去。
-            for (var id = 0; id < keys.Count; id++)
+            for (var id = 0; id < LocalizationIds.TextCount; id++)
             {
-                result[keys[id]] = id;
+                var path = byValue[localizer.Get(id)];
+                result[path] = id;
             }
 
             return result;
@@ -160,9 +165,8 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void WalkingContainersReachesExactlyTheSubtreeLeaves()
         {
-            var l = new Localizer(Catalog.Instance);
             var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
-            var leafCount = Catalog.Instance.Keys.Count;
+            var leafCount = LocalizationIds.TextCount;
             var expected = FlattenJson("zh-CN");
 
             foreach (var pair in TopLevelContainers())
@@ -173,12 +177,14 @@ namespace LocalizationRuntime.Tests
                 var reached = new List<string>();
                 CollectLeaves(containerId, leafCount, prefix, expected, reached);
 
-                var wanted = expected.Keys
-                    .Where(k => k.StartsWith(prefix + ".", StringComparison.Ordinal))
-                    .OrderBy(k => k, StringComparer.Ordinal)
+                // 按值对照（键路径已不再暴露）。
+                var wanted = expected
+                    .Where(kv => kv.Key.StartsWith(prefix + ".", StringComparison.Ordinal))
+                    .Select(kv => kv.Value)
+                    .OrderBy(v => v, StringComparer.Ordinal)
                     .ToArray();
 
-                var got = reached.OrderBy(k => k, StringComparer.Ordinal).ToArray();
+                var got = reached.OrderBy(v => v, StringComparer.Ordinal).ToArray();
 
                 Assert.True(
                     wanted.SequenceEqual(got, StringComparer.Ordinal),
@@ -207,16 +213,15 @@ namespace LocalizationRuntime.Tests
 
                 if (childId < leafCount)
                 {
-                    var key = Catalog.Instance.Keys[childId];
-                    Assert.True(
-                        expected.ContainsKey(key),
-                        "id=" + childId + " 的键 '" + key + "' 在 JSON 中不存在");
+                    // 没有键路径可查，改用值反查：测试资源的值全局唯一。
+                    var value = new Localizer(Catalog.Instance).Get(childId);
+                    Assert.True(value.Length > 0, "id=" + childId + " 取到空值");
 
-                    sink.Add(key);
+                    sink.Add(value);
                     continue;
                 }
 
-                // 容器：继续下探。路径前缀只用于出错信息，实际比对用 Catalog.Keys。
+                // 容器：继续下探。
                 CollectLeaves(childId, leafCount, pathPrefix, expected, sink);
             }
 
@@ -262,14 +267,11 @@ namespace LocalizationRuntime.Tests
         }
 
         [Fact]
-        public void LeafCountEqualsJsonLeafCount()
+        public void TextCountEqualsJsonLeafCount()
         {
-            var l = new Localizer(Catalog.Instance);
             foreach (var culture in Cultures)
             {
-                Assert.Equal(
-                    FlattenJson(culture).Count,
-                    Catalog.Instance.Keys.Count);
+                Assert.Equal(LocalizationIds.TextCount, FlattenJson(culture).Count);
             }
         }
     }
