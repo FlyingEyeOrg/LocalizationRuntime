@@ -108,11 +108,14 @@ jobs:
               $nupkg = "artifacts/$name.$version.nupkg"
               if (-not (Test-Path $nupkg)) { throw "找不到打包产物：$nupkg" }
 
-              # 不传 --skip-duplicate：同名同版本已存在时必须报错，
-              # 否则会被当成"成功"而掩盖真正的失败原因。
+              # --skip-duplicate：同名同版本已发布时视为成功。
+              # 重跑工作流、或补推另一个包时都会遇到这种情况，
+              # 报错只会让「重试」变成需要人工判断的麻烦事。
+              # 它只吞掉「已存在」这一种情况，其他错误仍会以非零退出码暴露。
               dotnet nuget push $nupkg `
                 --source "https://api.nuget.org/v3/index.json" `
-                --api-key $env:NUGET_API_KEY
+                --api-key $env:NUGET_API_KEY `
+                --skip-duplicate
               if ($LASTEXITCODE -ne 0) { throw "$name $version 推送失败（退出码 $LASTEXITCODE）" }
 
               # 符号包要与主包分开推，且必须在主包之后。
