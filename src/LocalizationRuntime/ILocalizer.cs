@@ -18,6 +18,9 @@ namespace LocalizationRuntime
         ///
         /// 典型用法是刷新那些缓存了文本的属性。注意本类是单例：
         /// 订阅者若是短生命周期对象，务必在销毁时退订，否则会被单例长期持有。
+        ///
+        /// 这里刻意只提供一个普通 .NET 事件——不做弱引用订阅表，也不做自动刷新，
+        /// 订阅与退订的责任完全在调用方。
         /// </summary>
         event EventHandler<CultureChangedEventArgs>? CultureChanged;
 
