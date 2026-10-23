@@ -108,15 +108,17 @@ jobs:
               $nupkg = "artifacts/$name.$version.nupkg"
               if (-not (Test-Path $nupkg)) { throw "找不到打包产物：$nupkg" }
 
+              # 不传 --skip-duplicate：同名同版本已存在时必须报错，
+              # 否则会被当成"成功"而掩盖真正的失败原因。
               dotnet nuget push $nupkg `
                 --source "https://api.nuget.org/v3/index.json" `
-                --api-key $env:NUGET_API_KEY `
-                --skip-duplicate
+                --api-key $env:NUGET_API_KEY
               if ($LASTEXITCODE -ne 0) { throw "$name $version 推送失败（退出码 $LASTEXITCODE）" }
 
               # 符号包要与主包分开推，且必须在主包之后。
               $snupkg = "artifacts/$name.$version.snupkg"
               if (Test-Path $snupkg) {
+                  # 符号包可以重复上传（主包已存在时尤其常见），skip 是合理的。
                   dotnet nuget push $snupkg `
                     --source "https://api.nuget.org/v3/index.json" `
                     --api-key $env:NUGET_API_KEY `
