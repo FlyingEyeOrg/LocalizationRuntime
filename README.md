@@ -3,20 +3,24 @@
 编译期固化多语言资源的 .NET 本地化运行时。运行时**不加载任何资源文件、不做 JSON 解析**，只做一次数组索引。
 
 ```csharp
-var localizer = new Localizer(L.Catalog);   // 按系统 culture 自动选语言
-var l = new L(localizer);
+var l = new Localizer(Catalog.Instance);    // 按系统 culture 自动选语言
 
-l.App.Title.Value;                              // "退刀管控系统"
-localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
-l.App.Title.Value;                              // "Tool Retraction Control"
+l.Get(LocalizationIds.AppObject.Title);     // "退刀管控系统"
+l.SetCulture(CultureInfo.GetCultureInfo("en-US"));
+l.Get(LocalizationIds.AppObject.Title);     // "Tool Retraction Control"
+
+// 容器也能取：整个数组、元素个数、递归拍平
+l.GetValues(LocalizationIds.MainWindowObject.Tabs);   // ["换刀", "设备信息", ...]
+l.GetChildCount(LocalizationIds.Menus);               // 3
+l.GetAllValues(LocalizationIds.Matrix);               // ["A1", "A2", "B1"]
 ```
 
-核心只有两件事：**按 key 取当前语言的值**，**设置当前语言**。
+核心只有两件事：**按 id 取当前语言的值**，**设置当前语言**。
 
 ```csharp
-localizer.Get(TextIds.App.Title);                   // 编译期 id，最快
-localizer.Get("App.Title");                         // 字符串 key
-localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
+l.Get(LocalizationIds.AppObject.Title);     // 编译期 id，最快
+l.Get("App.Title");                         // 字符串 key
+l.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
 ```
 
 没有通知、没有订阅、没有弱引用。切语言后再次取值自然就是新语言的值——
@@ -59,51 +63,108 @@ localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
 对上面三个文件，生成器产出：
 
 ```csharp
-internal static class TextIds            // 键 → 编译期 id，结构与 JSON 层级一致
+public static class LocalizationIds        // 键 → 编译期 id，结构与 JSON 层级一致
 {
-    public static class App
+    // 容器 id：数组与对象本身也有 id，能取整段
+    public const int Menus = 21;
+    public const int Data = 14;
+
+    public static class MenusObject
     {
-        public const int Title = 2;
-    }
-    public static class MainWindow
-    {
-        public const int Title = 16;
-        public static class Tabs
+        public const int MenusItem0 = 22;     // 数组元素 → {前缀}Item{N}
+        public const int MenusItem1 = 23;
+        public const int MenusItem2 = 24;
+
+        public static class MenusItem0Object
         {
-            public const int Item0 = 5;     // 数组下标 → Item{N}
-            public const int Item10 = 15;
+            public const int Title = 8;       // 叶子：真实数组下标
+            public const int Value = 9;
+        }
+    }
+
+    public static class DataObject
+    {
+        public const int DataItem0 = 15;
+        public static class DataItem0Object
+        {
+            public const int DataItem0Item0 = 16;   // 嵌套数组：Item 逐层累加
+            public const int DataItem0Item1 = 17;
+
+            public static class DataItem0Item0Object
+            {
+                public const int Value1 = 0;
+                public const int Value2 = 1;
+            }
         }
     }
 }
-internal sealed class GeneratedCatalog  // 每语言一个 string?[]（缺键为 null）
-internal sealed class L                 // 强类型访问器
-{
-    public AppStrings App { get; }
-    public MainWindowStrings MainWindow { get; }
-}
+internal sealed class GeneratedCatalog  // 每语言一个 string?[]（缺键为 null）+ 父子表
 ```
 
-键的层级与 JSON 完全对应，所以 `MainWindow.UserInfo.UserName` 就是 `TextIds.MainWindow.UserInfo.UserName`。
+键的层级与 JSON 完全对应，所以 `MainWindow.UserInfo.UserName` 就是 `LocalizationIds.MainWindowObject.UserInfoObject.UserName`。
 
-数字段不能作标识符，统一映射成 `Item{N}`，层级不受影响：
+数字段不能作标识符，统一映射成 `Item{N}`，且**每一层都保留 `Item`**：
 
 | JSON | 生成的键 |
 |---|---|
-| `"Tabs": ["a", "b"]` | `TextIds.MainWindow.Tabs.Item0` |
-| `"Menus": [{ "Header": "文件" }]` | `TextIds.Menus.Item0.Header` |
-| `"Menus": [{ "Items": ["新建"] }]` | `TextIds.Menus.Item0.Items.Item0` |
+| `"Tabs": ["a", "b"]` | `LocalizationIds.TabsObject.TabsItem0` |
+| `"Menus": [{ "Header": "文件" }]` | `LocalizationIds.MenusObject.MenusItem0Object.Header` |
+| `"Data": [[{ "V": 1 }]]` | `LocalizationIds.DataObject.DataItem0Object.DataItem0Item0Object.V` |
 
-对象数组（数组里是对象）会完整展开，每个元素一个 `Item{N}` 类，字段照常嵌套。
+命名规则只有一条：**类名一律以 `Object` 结尾，`int` 常量一律不带**。
 
-访问器分两类：
+## 取值
 
-| 形状 | 类型 | 说明 |
+两个区间，互不重叠：
+
+| id 区间 | 含义 | `Get(id)` |
 |---|---|---|
-| `"Title": "..."` | `LocalizedText` | 单值，`.Value` 为一次数组索引 |
-| `"Tabs": ["a","b","c"]` | `LocalizedList` | 数组，长度编译期已知；`.Value` 按版本号缓存，切一次语言只换一次引用 |
+| `0 .. Keys.Count-1` | 叶子（具体文本） | 返回字符串 |
+| `>= Keys.Count` | 容器（数组 / 对象） | `ArgumentOutOfRangeException` |
 
-`LocalizedList` 缓存引用是有意的：绑到 `TabControl.ItemsSource` 时，切语言不重建控件，
-`SelectedIndex` 和滚动位置都不会丢。
+容器没有文本，所以传给 `Get` 会抛异常——这能在编译期挡住「把数组当字符串用」。
+
+```csharp
+var l = new Localizer(Catalog.Instance);
+
+string title = l.Get(LocalizationIds.AppObject.Title);   // 单值
+```
+
+## 容器：取整个数组
+
+容器 id 不只是标签，它能拿到子 id、元素个数和整段文本。
+
+```csharp
+// 元素个数
+int n = l.GetChildCount(LocalizationIds.Menus);          // 3
+
+// 一维字符串数组：一次取全部
+string[] tabs = l.GetValues(LocalizationIds.MainWindowObject.Tabs);
+
+// 对象数组：先拿子 id，再逐个展开
+foreach (int itemId in l.GetChildren(LocalizationIds.Menus))
+{
+    Console.WriteLine(l.GetChildCount(itemId));          // 该元素的成员数
+}
+
+// 二维数组：按层取，顺序严格等于下标顺序
+foreach (int rowId in l.GetChildren(LocalizationIds.Matrix))
+{
+    Console.WriteLine(string.Join(" | ", l.GetValues(rowId)));
+}
+
+// 任意深度：递归拍平成一条
+string[] all = l.GetAllValues(LocalizationIds.Cube);
+```
+
+| 方法 | 用途 |
+|---|---|
+| `GetChildCount(id)` | 直接子节点个数；叶子返回 0 |
+| `GetChildren(id)` | 直接子 id 数组；叶子/越界返回空数组 |
+| `GetValues(id)` | 子节点全是文本时，一次取全部；混有对象则抛异常并提示改用 `GetChildren` |
+| `GetAllValues(id)` | 递归展开整棵子树，按顺序返回所有叶子 |
+
+注意：数组顺序严格等于下标顺序；对象成员的顺序由键的排序决定，与 JSON 原文顺序可能不同，但每次运行都一致。
 
 ## 切语言后如何刷新界面
 
@@ -112,11 +173,11 @@ internal sealed class L                 // 强类型访问器
 ```csharp
 // 控制台 / 服务：直接再读一次
 localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
-Console.WriteLine(l.App.Title.Value);
+Console.WriteLine(l.Get(LocalizationIds.AppObject.Title));
 
 // WPF：切语言后自行触发一次重读，例如重新查询 VM 的属性
 localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
-viewModel.RefreshLocalizedText();
+viewModel.ReloadTexts();
 ```
 
 这样做的原因：通知机制要么强制表持有响应对象（会导致泄漏，需要弱引用和压缩逻辑），
@@ -188,23 +249,23 @@ dotnet build -p:LocalizationClassName=Strings
 | 操作 | 耗时 | 分配 |
 |---|---|---|
 | `Get(id)` 命中 | 1.5 ns | 0 B |
-| `Get(string)` 命中 | 11.3 ns | 0 B |
-| `LocalizedText.Value` | 1.6 ns | 0 B |
-| `LocalizedList.Value` 命中缓存 | 9.1 ns | 0 B |
-| `SetCulture`（已缓存） | 0.09 µs | — |
+| `Get(string)` 命中 | 10.4 ns | 0 B |
+| `Get(id)` 叶子 | 0.71 ns | 0 B |
+| `GetValues(数组)` 一次取 N 个 | 视 N 而定 | 1 次分配 |
+| `SetCulture`（已缓存） | 0.12 µs | — |
 | 首次切到未缓存语言（含建表） | 3.1 ms | — |
-| **启动**（访问 catalog + 建表 + 建访问器） | **9.0 ms** | — |
+| **启动**（访问 catalog + 建表） | **8.4 ms** | — |
 
 几个关键点：
 
 - `Get(id)` 是一次快照引用读加一次数组索引，热路径无锁、无字典哈希、零分配。
-- **访问器惰性创建**：只有真正被读取的键才分配 `LocalizedText`/`LocalizedList`，
-  启动成本与「用到的键数」成正比，而不是与「总键数」成正比。
 - **语言表惰性填充**：只有被请求的语言才建数组，启动时只付当前语言的代价。
-- `LocalizedList` 的缓存以不可变对象整体替换，命中时不加锁；未命中才在锁内重建。
+- **父子表是编译期常量**：容器 → 子 id 是一张 `int[][]`，`GetChildren` 退化为一次索引，不建字典。
+- `GetValues` / `GetAllValues` 每次调用分配一个新数组，适合「切语言后重建一次列表」，
+  不适合放进逐帧渲染的热路径。
 - `SetCulture` 只做一次快照替换，不遍历、不分配。
 
-去掉通知机制后 `SetCulture` 从 0.19 µs 降到 0.09 µs——因为不再需要遍历单元列表。
+`SetCulture` 只做一次受支持性哈希查找和一次快照替换，不遍历、不分配。
 
 ## 测试
 
@@ -271,3 +332,7 @@ trim / 单文件发布都安全。启动只加载当前语言，切语言时才�
 这会让产品失去运行时切换语言的能力，也失去按系统 culture 自动探测的能力——
 用户装到日语系统上只能看到中文。除非走多语言安装包路线，否则不该这么做。
 安装包层面按语言分发 dll 是另一回事，与库无关。
+
+
+
+

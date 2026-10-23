@@ -56,11 +56,24 @@ namespace LocalizationRuntime
                 _index[keys[i]] = i;
             }
 
+            // 把每种受支持语言及其整条 Parent 链都登记进去，
+            // 这样判断"是否受支持"退化为一次哈希查找，不必在 SetCulture 里走链。
             _supported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             for (var i = 0; i < catalog.CultureNames.Count; i++)
             {
-                _supported.Add(catalog.CultureNames[i]);
+                var name = catalog.CultureNames[i];
+                _supported.Add(name);
+
+                for (var parent = CultureInfo.GetCultureInfo(name).Parent;
+                     parent != null && !string.IsNullOrEmpty(parent.Name);
+                     parent = parent.Parent)
+                {
+                    _supported.Add(parent.Name);
+                }
             }
+
+            // 基语言本身永远算受支持。
+            _supported.Add(catalog.DefaultCultureName);
 
             var culture = initialCulture ?? DetectSystemCulture();
 
@@ -117,6 +130,97 @@ namespace LocalizationRuntime
             return _index.TryGetValue(key, out id) ? Get(id) : key;
         }
 
+        // ───────────────────────── 容器（数组 / 对象）─────────────────────────
+
+        /// <summary>
+        /// 取容器的直接子 id 个数。数组返回元素个数；对象返回成员个数；叶子返回 0。
+        /// 传容器 id 即可，例如 <c>GetChildCount(LocalizationIds.Menus)</c> 得到菜单项数。
+        /// </summary>
+        public int GetChildCount(int containerId)
+        {
+            return _catalog.GetChildren(containerId).Length;
+        }
+
+        /// <summary>
+        /// 取容器的直接子 id。数组即各元素 id，逐项传给 <see cref="Get(int)"/> 或
+        /// 继续传给本方法即可展开整棵子树。
+        ///
+        /// 返回的数组由 catalog 缓存，只读，请勿修改。
+        /// </summary>
+        public int[] GetChildren(int containerId)
+        {
+            return _catalog.GetChildren(containerId);
+        }
+
+        /// <summary>
+        /// 取「数组」的全部元素文本。仅当子节点全是叶子时可用（字符串数组）；
+        /// 若元素本身是对象或数组，会抛 <see cref="InvalidOperationException"/>，
+        /// 此时应改用 <see cref="GetChildren"/> 逐层展开。
+        /// </summary>
+        public string[] GetValues(int containerId)
+        {
+            var children = _catalog.GetChildren(containerId);
+            if (children.Length == 0)
+            {
+                // 叶子或空容器：返回空数组，避免调用方还要判空。
+                return Array.Empty<string>();
+            }
+
+            var values = new string[children.Length];
+            var snapshot = Volatile.Read(ref _snapshot);
+            var table = snapshot.Values;
+
+            for (var i = 0; i < children.Length; i++)
+            {
+                var childId = children[i];
+                if ((uint)childId >= (uint)table.Length)
+                {
+                    throw new InvalidOperationException(
+                        "id " + containerId + " 的子节点不是文本（而是对象或数组），请改用 GetChildren 逐层展开。");
+                }
+
+                values[i] = table[childId];
+            }
+
+            return values;
+        }
+
+        /// <summary>
+        /// 递归展开容器的整棵子树，按 JSON 中的顺序返回所有叶子文本。
+        /// 适合"把一个多维数组拍平"这类场景。
+        /// </summary>
+        public string[] GetAllValues(int containerId)
+        {
+            var sink = new System.Collections.Generic.List<string>();
+            CollectLeaves(containerId, sink, Volatile.Read(ref _snapshot).Values, 0);
+            return sink.ToArray();
+        }
+
+        private void CollectLeaves(
+            int id,
+            System.Collections.Generic.List<string> sink,
+            string[] table,
+            int depth)
+        {
+            // 防呆：树深度正常不会超过几十层，出现异常环时立刻报错而不是爆栈。
+            if (depth > 64)
+            {
+                throw new InvalidOperationException("容器层级过深，疑似数据成环。");
+            }
+
+            if ((uint)id < (uint)table.Length)
+            {
+                sink.Add(table[id]);
+                return;
+            }
+
+            var children = _catalog.GetChildren(id);
+            for (var i = 0; i < children.Length; i++)
+            {
+                CollectLeaves(children[i], sink, table, depth + 1);
+            }
+        }
+
         /// <summary>
         /// 切换语言。无 IO，同步完成；返回是否真的发生了切换。
         ///
@@ -157,20 +261,13 @@ namespace LocalizationRuntime
             }
         }
 
-        /// <summary>该 culture 或其某个 Parent 是否在资源里存在。</summary>
+        /// <summary>
+        /// 该 culture 或其某个 Parent 是否在资源里存在。
+        /// _supported 在构造时已展开整条 Parent 链，所以这里只是一次哈希查找。
+        /// </summary>
         private bool IsSupportedOrAncestor(string cultureName)
         {
-            for (var c = CultureInfo.GetCultureInfo(cultureName);
-                 c != null && !string.IsNullOrEmpty(c.Name);
-                 c = c.Parent)
-            {
-                if (_supported.Contains(c.Name))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return _supported.Contains(cultureName);
         }
 
         private CultureInfo DetectSystemCulture()

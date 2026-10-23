@@ -90,7 +90,7 @@ namespace LocalizationRuntime.Generator
 
     /// <summary>
     /// 键的排序规则：按段比较，纯数字段按数值比。
-    /// 这样 MainWindow.Tabs.2 排在 .10 前面，数组元素保持连续，LocalizedList 才能用 baseId+length 表示。
+    /// 这样 MainWindow.Tabs.2 排在 .10 前面，数组元素的下标保持连续。
     /// </summary>
     internal sealed class NaturalKeyComparer : IComparer<string>
     {
@@ -259,3 +259,4 @@ namespace LocalizationRuntime.Generator
         }
     }
 }
+

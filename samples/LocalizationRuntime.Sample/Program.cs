@@ -116,6 +116,32 @@ namespace LocalizationRuntime.Sample
             // ⑨ 回退：ja-JP 没有 Cancel，应显示 zh-CN 的"取消"
             Console.WriteLine("Common.Cancel    : " + l.Get(LocalizationIds.CommonObject.Cancel));
             Console.WriteLine();
+
+            // ⑩ 容器 id：取整个数组、按层展开、拍平
+            Console.WriteLine("-- 容器（数组/对象）--");
+            Console.WriteLine("Tabs 元素数      : " + l.GetChildCount(LocalizationIds.MainWindowObject.Tabs));
+            Console.WriteLine("Tabs 全部        : " +
+                string.Join(" | ", l.GetValues(LocalizationIds.MainWindowObject.Tabs)));
+
+            Console.WriteLine("Menus 元素数     : " + l.GetChildCount(LocalizationIds.Menus));
+            foreach (var itemId in l.GetChildren(LocalizationIds.Menus))
+            {
+                Console.WriteLine("  Menus 元素 id=" + itemId +
+                                  " 子成员数=" + l.GetChildCount(itemId));
+            }
+
+            Console.WriteLine("Matrix 行数      : " + l.GetChildCount(LocalizationIds.Matrix));
+            foreach (var rowId in l.GetChildren(LocalizationIds.Matrix))
+            {
+                Console.WriteLine("  行: " + string.Join(" | ", l.GetValues(rowId)));
+            }
+
+            Console.WriteLine("Matrix 拍平      : " +
+                string.Join(" | ", l.GetAllValues(LocalizationIds.Matrix)));
+            Console.WriteLine("Cube 拍平        : " +
+                string.Join(" | ", l.GetAllValues(LocalizationIds.Cube)));
+            Console.WriteLine("App 成员数       : " + l.GetChildCount(LocalizationIds.App));
+            Console.WriteLine();
         }
     }
 }

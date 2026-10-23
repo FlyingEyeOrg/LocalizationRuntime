@@ -15,7 +15,7 @@ namespace LocalizationRuntime.Generator
     /// 读取 Localization/{culture}.json，把每种语言的文本编译成代码里的常量数组：
     ///   · 键 id 常量（const int）
     ///   · 每语言一个 string?[]，缺键为 null
-    ///   · 强类型访问器（LocalizedText / LocalizedList 的实例）
+    ///   · 强类型 id 常量（LocalizationIds）
     /// 运行时因此不加载任何资源文件、不做 JSON 解析。
     /// </summary>
     [Generator(LanguageNames.CSharp)]
@@ -201,7 +201,7 @@ namespace LocalizationRuntime.Generator
                 baseValues[entry.Path] = entry.Value;
             }
 
-            // 3) 稳定排序后编号。数组元素 .0 .1 .2 因自然序而连续，可折叠成 LocalizedList。
+            // 3) 稳定排序后编号。数组元素 .0 .1 .2 因自然序而连续，便于折叠成连续 id。
             var sortedKeys = baseValues.Keys.ToList();
             sortedKeys.Sort(NaturalKeyComparer.Instance);
 
@@ -397,6 +397,20 @@ namespace LocalizationRuntime.Generator
             sb.AppendLine("public static class LocalizationIds");
             sb.AppendLine("{");
 
+            var root = BuildKeyTree(model);
+
+            EmitKeyNodes(sb, root, "    ", string.Empty);
+
+            sb.AppendLine("}");
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// 由键列表构建命名树并分配容器 id。EmitKeys 与 EmitCatalog 共用，
+        /// 保证「生成的常量」与「运行时的父子表」出自同一棵树。
+        /// </summary>
+        private static KeyNode BuildKeyTree(ResourceModel model)
+        {
             var root = new KeyNode(null, null);
 
             // 先登记所有叶子，同时记录每片叶子的真实路径（用于数组元素命名）
@@ -405,14 +419,9 @@ namespace LocalizationRuntime.Generator
                 root.Add(key.Path, key.Id);
             }
 
-            // 容器 id 从叶子总数开始，与叶子区间不重叠，
-            // 因此把容器 id 传给 Get 必然越界，天然挡住误用。
+            // 容器 id 从叶子总数开始，与叶子区间不重叠。
             root.AssignContainerIds(model.Keys.Length);
-
-            EmitKeyNodes(sb, root, "    ", string.Empty);
-
-            sb.AppendLine("}");
-            return sb.ToString();
+            return root;
         }
 
         /// <summary>
@@ -668,6 +677,35 @@ namespace LocalizationRuntime.Generator
             }
         }
 
+        /// <summary>
+        /// 遍历命名树，产出「容器 id → 直接子 id 数组」。
+        ///
+        /// 只有带 id 的节点（非叶子）才会成为键；子 id 按树中的原始顺序排列，
+        /// 因此数组节点的子 id 顺序就是数组下标顺序。
+        /// </summary>
+        private static void CollectChildren(KeyNode node, Dictionary<int, List<int>> sink)
+        {
+            if (node.Id.HasValue && node.Children.Count > 0)
+            {
+                var list = new List<int>(node.Children.Count);
+                sink[node.Id.Value] = list;
+
+                foreach (var child in node.Children)
+                {
+                    if (child.Id.HasValue)
+                    {
+                        // 叶子与容器都有 id，统一记录，调用方按 id 大小区分。
+                        list.Add(child.Id.Value);
+                    }
+                }
+            }
+
+            foreach (var child in node.Children)
+            {
+                CollectChildren(child, sink);
+            }
+        }
+
         private static string EmitCatalog(ResourceModel model)
         {
             var sb = new StringBuilder(256 * 1024);
@@ -719,6 +757,62 @@ namespace LocalizationRuntime.Generator
             sb.AppendLine("    public global::System.Collections.Generic.IReadOnlyList<string> Keys => AllKeys;");
             sb.AppendLine();
             sb.AppendLine("    public global::System.Collections.Generic.IReadOnlyList<string> CultureNames => AllCultures;");
+            sb.AppendLine();
+
+            // ── 父子表：容器 id → 直接子 id ──
+            // 用交错数组而不是 Dictionary：只在编译期固定内容，查表退化为一次索引。
+            var tree = BuildKeyTree(model);
+            var childSink = new Dictionary<int, List<int>>();
+            CollectChildren(tree, childSink);
+
+            var totalIds = model.Keys.Length;
+            foreach (var containerId in childSink.Keys)
+            {
+                if (containerId >= totalIds)
+                {
+                    totalIds = containerId + 1;
+                }
+            }
+
+            string[] childTable;
+            {
+                var map = new string[totalIds];
+                for (var i = 0; i < totalIds; i++)
+                {
+                    List<int>? children;
+                    map[i] = childSink.TryGetValue(i, out children)
+                        ? "new int[] { " + string.Join(", ", children) + " }"
+                        : "global::System.Array.Empty<int>()";
+                }
+
+                childTable = map;
+            }
+
+            sb.AppendLine("    /// <summary>容器 id → 直接子 id。叶子与无子节点者为空数组。</summary>");
+            sb.AppendLine("    private static readonly int[][] ChildIndex =");
+            sb.AppendLine("    {");
+            for (var i = 0; i < childTable.Length; i++)
+            {
+                sb.Append("        ");
+                sb.Append(childTable[i]);
+                sb.AppendLine(",");
+            }
+
+            sb.AppendLine("    };");
+            sb.AppendLine();
+            sb.Append("    public int TotalIdCount => ");
+            sb.Append(totalIds.ToString(CultureInfo.InvariantCulture));
+            sb.AppendLine(";");
+            sb.AppendLine();
+            sb.AppendLine("    public int[] GetChildren(int id)");
+            sb.AppendLine("    {");
+            sb.AppendLine("        if ((uint)id >= (uint)ChildIndex.Length)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            return global::System.Array.Empty<int>();");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            sb.AppendLine("        return ChildIndex[id];");
+            sb.AppendLine("    }");
             sb.AppendLine();
 
             for (var i = 0; i < model.Cultures.Length; i++)
@@ -1028,6 +1122,7 @@ namespace LocalizationRuntime.Generator
         public List<ResourceFlattener.Entry> Entries { get; }
     }
 }
+
 
 
 

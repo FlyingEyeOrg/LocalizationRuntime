@@ -18,6 +18,24 @@ namespace LocalizationRuntime
         IReadOnlyList<string> Keys { get; }
 
         /// <summary>
+        /// id 总数（叶子 + 容器）。合法 id 的内部存储是 0..TotalIdCount-1，
+        /// 但只有小于 <c>Keys.Count</c> 的才是可取值的叶子。
+        /// </summary>
+        int TotalIdCount { get; }
+
+        /// <summary>
+        /// 取某个容器 id 的直接子 id（按数组/对象中的原始顺序）。
+        ///
+        /// 对数组节点：子 id 依次是各个元素的 id，长度即数组长度。
+        /// 对对象节点：子 id 依次是各成员的 id。
+        /// 对叶子：返回空数组。
+        /// id 越界时返回空数组。
+        ///
+        /// 返回的数组由实现方缓存，调用方不得修改。
+        /// </summary>
+        int[] GetChildren(int id);
+
+        /// <summary>
         /// 取某语言的原始表，长度等于 <see cref="Keys"/> 的长度，缺键位置为 null。
         /// 该语言不存在时返回 null。返回的数组只读，调用方不得修改。
         /// </summary>

@@ -39,6 +39,31 @@ namespace LocalizationRuntime.Tests
             "Hello", "Tabs.0", "Tabs.1", "About.Title", "About.Body"
         };
 
+        /// <summary>
+        /// 键 id：0=Hello, 1=Tabs.0, 2=Tabs.1, 3=About.Title, 4=About.Body。
+        /// 容器：5=Tabs(数组), 6=About(对象)，子 id 见下表。
+        /// </summary>
+        private static readonly int[][] Children =
+        {
+            new int[0],        // 0 Hello（叶子）
+            new int[0],        // 1 Tabs.0
+            new int[0],        // 2 Tabs.1
+            new int[0],        // 3 About.Title
+            new int[0],        // 4 About.Body
+            new[] { 1, 2 },    // 5 Tabs → 两个元素
+            new[] { 3, 4 },    // 6 About → 两个成员
+        };
+
+        public int TotalIdCount
+        {
+            get { return Children.Length; }
+        }
+
+        public int[] GetChildren(int id)
+        {
+            return (uint)id < (uint)Children.Length ? Children[id] : System.Array.Empty<int>();
+        }
+
         public string?[]? GetTable(string cultureName)
         {
             return _tables.TryGetValue(cultureName, out var t) ? t : null;
@@ -144,57 +169,8 @@ namespace LocalizationRuntime.Tests
             Assert.Equal("こんにちは", localizer.Get("Hello"));
         }
 
-        [Fact]
-        public void LocalizedText_TracksCulture_WithoutSubscription()
-        {
-            var localizer = new Localizer(CreateCatalog(), CultureInfo.GetCultureInfo("en-US"));
-            var text = new LocalizedText(localizer, 0);
 
-            Assert.Equal("Hello", text.Value);
 
-            localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
-
-            // 不需要任何通知：再读一次就是新语言的值
-            Assert.Equal("こんにちは", text.Value);
-        }
-
-        [Fact]
-        public void LocalizedList_CachesUntilRevisionChanges()
-        {
-            var localizer = new Localizer(CreateCatalog(), CultureInfo.GetCultureInfo("en-US"));
-            var list = new LocalizedList(localizer, 1, 2);
-
-            var first = list.Value;
-            var second = list.Value;
-
-            // 未切语言：必须是同一个实例，避免重复分配
-            Assert.Same(first, second);
-            Assert.Equal("One", first[0]);
-
-            localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
-
-            var third = list.Value;
-            Assert.NotSame(first, third);
-            Assert.Equal("一", third[0]);
-            // Tabs.1 在 ja-JP 缺失，回退基语言
-            Assert.Equal("二", third[1]);
-        }
-
-        [Fact]
-        public void LocalizedList_Indexer_ReadsThroughCurrentSnapshot()
-        {
-            var localizer = new Localizer(CreateCatalog(), CultureInfo.GetCultureInfo("en-US"));
-            var list = new LocalizedList(localizer, 1, 2);
-
-            Assert.Equal("One", list[0]);
-            Assert.Equal("Two", list[1]);
-
-            localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
-
-            Assert.Equal("一", list[0]);
-            // Tabs.1 回退基语言
-            Assert.Equal("二", list[1]);
-        }
 
         [Fact]
         public void Concurrent_SetCulture_EndsInOneOfTheRequestedCultures()
@@ -256,3 +232,4 @@ namespace LocalizationRuntime.Tests
         }
     }
 }
+
