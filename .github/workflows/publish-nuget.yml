@@ -101,8 +101,14 @@ jobs:
       - name: Verify symbol packages
         shell: pwsh
         run: |
-          ./eng/verify-symbols.ps1 -ArtifactsDirectory artifacts -PackageId LocalizationRuntime
-          if ($LASTEXITCODE -ne 0) { throw "符号包校验失败" }
+          $output = & ./eng/verify-symbols.ps1 -ArtifactsDirectory artifacts -PackageId LocalizationRuntime 2>&1 | Out-String
+          $code = $LASTEXITCODE
+          Write-Output $output
+
+          # 同时写进 job summary：失败时不用下载日志就能看到是哪一对不匹配。
+          $output | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+          if ($code -ne 0) { throw "符号包校验失败" }
 
       - name: Upload NuGet packages
         uses: actions/upload-artifact@v4

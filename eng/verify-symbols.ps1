@@ -99,6 +99,8 @@ try {
         $dllGuid = Get-CodeViewGuid $dll
         $pdbGuid = Get-PdbGuid $pdb.FullName
 
+        Write-Output ("  info  {0}  dll={1}B pdb={2}B" -f $relative, (Get-Item $dll).Length, $pdb.Length)
+
         if ($null -eq $dllGuid) { $problems += "$dllRelative 没有 CodeView 记录" }
         elseif ($null -eq $pdbGuid) { $problems += "$relative 不是可识别的 portable pdb" }
         elseif ($dllGuid -ne $pdbGuid) {
