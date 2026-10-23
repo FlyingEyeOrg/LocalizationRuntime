@@ -190,7 +190,13 @@ namespace LocalizationRuntime.Tests
                 string.Join(Environment.NewLine, duplicates));
         }
 
-        /// <summary>zh-CN.json 的叶子总数。改动测试资源时必须同步更新。</summary>
+        /// <summary>
+        /// zh-CN.json 的叶子总数。
+        ///
+        /// 这是个刻意的「绊线」：改动资源文件时它必然失败，提醒你确认
+        /// 新增/删除的键是有意的。真正的正确性由 LocalizationJsonParityTests
+        /// 全量校验，那条不需要维护任何数字。
+        /// </summary>
         private const int ExpectedLeafCount = 33;
 
         [Fact]
