@@ -800,10 +800,6 @@ namespace LocalizationRuntime.Generator
 
             sb.AppendLine("    };");
             sb.AppendLine();
-            sb.Append("    public int TotalIdCount => ");
-            sb.Append(totalIds.ToString(CultureInfo.InvariantCulture));
-            sb.AppendLine(";");
-            sb.AppendLine();
             sb.AppendLine("    public int[] GetChildren(int id)");
             sb.AppendLine("    {");
             sb.AppendLine("        if ((uint)id >= (uint)ChildIndex.Length)");

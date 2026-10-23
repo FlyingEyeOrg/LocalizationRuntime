@@ -18,12 +18,6 @@ namespace LocalizationRuntime
         IReadOnlyList<string> Keys { get; }
 
         /// <summary>
-        /// id 总数（叶子 + 容器）。合法 id 的内部存储是 0..TotalIdCount-1，
-        /// 但只有小于 <c>Keys.Count</c> 的才是可取值的叶子。
-        /// </summary>
-        int TotalIdCount { get; }
-
-        /// <summary>
         /// 取某个容器 id 的直接子 id（按数组/对象中的原始顺序）。
         ///
         /// 对数组节点：子 id 依次是各个元素的 id，长度即数组长度。

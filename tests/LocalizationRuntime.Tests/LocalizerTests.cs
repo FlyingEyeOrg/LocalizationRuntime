@@ -55,10 +55,6 @@ namespace LocalizationRuntime.Tests
             new[] { 3, 4 },    // 6 About → 两个成员
         };
 
-        public int TotalIdCount
-        {
-            get { return Children.Length; }
-        }
 
         public int[] GetChildren(int id)
         {
@@ -373,5 +369,6 @@ namespace LocalizationRuntime.Tests
         }
     }
 }
+
 
 
