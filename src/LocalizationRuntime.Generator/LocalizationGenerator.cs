@@ -722,6 +722,16 @@ namespace LocalizationRuntime.Generator
             sb.AppendLine("{");
             sb.AppendLine("    /// <summary>唯一的 catalog 实例。生成器已把全部语言编译进程序集。</summary>");
             sb.AppendLine("    public static readonly global::LocalizationRuntime.ILocalizationCatalog Instance = new GeneratedCatalog();");
+            sb.AppendLine();
+            sb.AppendLine("    /// <summary>");
+            sb.AppendLine("    /// 模块加载时把本 catalog 注册到静态的 Localizer，");
+            sb.AppendLine("    /// 因此调用方无需任何初始化代码即可直接使用 Localizer.Get(...)。");
+            sb.AppendLine("    /// </summary>");
+            sb.AppendLine("    [global::System.Runtime.CompilerServices.ModuleInitializer]");
+            sb.AppendLine("    internal static void RegisterWithLocalizer()");
+            sb.AppendLine("    {");
+            sb.AppendLine("        global::LocalizationRuntime.Localizer.Install(Instance);");
+            sb.AppendLine("    }");
             sb.AppendLine("}");
             sb.AppendLine();
             sb.AppendLine("internal sealed class GeneratedCatalog : global::LocalizationRuntime.ILocalizationCatalog");

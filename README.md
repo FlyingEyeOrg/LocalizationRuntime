@@ -3,24 +3,23 @@
 编译期固化多语言资源的 .NET 本地化运行时。运行时**不加载任何资源文件、不做 JSON 解析**，只做一次数组索引。
 
 ```csharp
-var l = new Localizer(Catalog.Instance);    // 按系统 culture 自动选语言
-
-l.Get(LocalizationIds.AppObject.Title);     // "退刀管控系统"
-l.SetCulture(CultureInfo.GetCultureInfo("en-US"));
-l.Get(LocalizationIds.AppObject.Title);     // "Tool Retraction Control"
+// 不需要任何初始化：生成的 Catalog 在模块加载时自动注册
+Localizer.Get(LocalizationIds.AppObject.Title);     // "退刀管控系统"
+Localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
+Localizer.Get(LocalizationIds.AppObject.Title);     // "Tool Retraction Control"
 
 // 容器也能取：整个数组、元素个数、递归拍平
-l.GetValues(LocalizationIds.MainWindowObject.Tabs);   // ["换刀", "设备信息", ...]
-l.GetChildCount(LocalizationIds.Menus);               // 3
-l.GetAllValues(LocalizationIds.Matrix);               // ["A1", "A2", "B1"]
+Localizer.GetValues(LocalizationIds.MainWindowObject.Tabs);   // ["换刀", "设备信息", ...]
+Localizer.GetChildCount(LocalizationIds.Menus);               // 3
+Localizer.GetAllValues(LocalizationIds.Matrix);               // ["A1", "A2", "B1"]
 ```
 
 核心只有两件事：**按 id 取当前语言的值**，**设置当前语言**。
 
 ```csharp
-l.Get(LocalizationIds.AppObject.Title);     // 编译期 id，最快
-l.Get("App.Title");                         // 字符串 key
-l.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
+Localizer.Get(LocalizationIds.AppObject.Title);     // 编译期 id，最快
+Localizer.Get("App.Title");                         // 字符串 key
+Localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
 ```
 
 没有通知、没有订阅、没有弱引用。切语言后再次取值自然就是新语言的值——
@@ -125,9 +124,7 @@ internal sealed class GeneratedCatalog  // 每语言一个 string?[]（缺键为
 容器没有文本，所以传给 `Get` 会抛异常——这能在编译期挡住「把数组当字符串用」。
 
 ```csharp
-var l = new Localizer(Catalog.Instance);
-
-string title = l.Get(LocalizationIds.AppObject.Title);   // 单值
+string title = Localizer.Get(LocalizationIds.AppObject.Title);   // 单值
 ```
 
 ## 容器：取整个数组
@@ -136,25 +133,25 @@ string title = l.Get(LocalizationIds.AppObject.Title);   // 单值
 
 ```csharp
 // 元素个数
-int n = l.GetChildCount(LocalizationIds.Menus);          // 3
+int n = Localizer.GetChildCount(LocalizationIds.Menus);          // 3
 
 // 一维字符串数组：一次取全部
-string[] tabs = l.GetValues(LocalizationIds.MainWindowObject.Tabs);
+string[] tabs = Localizer.GetValues(LocalizationIds.MainWindowObject.Tabs);
 
 // 对象数组：先拿子 id，再逐个展开
-foreach (int itemId in l.GetChildren(LocalizationIds.Menus))
+foreach (int itemId in Localizer.GetChildren(LocalizationIds.Menus))
 {
-    Console.WriteLine(l.GetChildCount(itemId));          // 该元素的成员数
+    Console.WriteLine(Localizer.GetChildCount(itemId));          // 该元素的成员数
 }
 
 // 二维数组：按层取，顺序严格等于下标顺序
-foreach (int rowId in l.GetChildren(LocalizationIds.Matrix))
+foreach (int rowId in Localizer.GetChildren(LocalizationIds.Matrix))
 {
-    Console.WriteLine(string.Join(" | ", l.GetValues(rowId)));
+    Console.WriteLine(string.Join(" | ", Localizer.GetValues(rowId)));
 }
 
 // 任意深度：递归拍平成一条
-string[] all = l.GetAllValues(LocalizationIds.Cube);
+string[] all = Localizer.GetAllValues(LocalizationIds.Cube);
 ```
 
 | 方法 | 用途 |
@@ -172,11 +169,11 @@ string[] all = l.GetAllValues(LocalizationIds.Cube);
 
 ```csharp
 // 控制台 / 服务：直接再读一次
-localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
-Console.WriteLine(l.Get(LocalizationIds.AppObject.Title));
+Localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
+Console.WriteLine(Localizer.Get(LocalizationIds.AppObject.Title));
 
 // WPF：切语言后自行触发一次重读，例如重新查询 VM 的属性
-localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
+Localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
 viewModel.ReloadTexts();
 ```
 
@@ -332,6 +329,7 @@ trim / 单文件发布都安全。启动只加载当前语言，切语言时才�
 这会让产品失去运行时切换语言的能力，也失去按系统 culture 自动探测的能力——
 用户装到日语系统上只能看到中文。除非走多语言安装包路线，否则不该这么做。
 安装包层面按语言分发 dll 是另一回事，与库无关。
+
 
 
 

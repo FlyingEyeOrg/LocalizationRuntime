@@ -157,7 +157,7 @@ namespace LocalizationRuntime.Tests
         public void ContainerId_IsNotReadableAsText()
         {
             var leafCount = Catalog.Instance.Keys.Count;
-            var localizer = new Localizer(Catalog.Instance);
+            Localizer.Install(Catalog.Instance);
 
             // 容器 id 落在叶子区间之外，取值必须抛异常，从而挡住误用
             var containerId = AllIds().Values.Where(v => v >= leafCount).DefaultIfEmpty(-1).Max();
@@ -167,7 +167,7 @@ namespace LocalizationRuntime.Tests
                 return; // 没有数组，跳过
             }
 
-            Assert.Throws<ArgumentOutOfRangeException>(() => localizer.Get(containerId));
+            Assert.Throws<ArgumentOutOfRangeException>(() => Localizer.Get(containerId));
         }
 
 
@@ -175,13 +175,13 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void Localizer_ReturnsActualTextForEveryLeaf()
         {
-            var localizer = new Localizer(Catalog.Instance);
+            Localizer.Install(Catalog.Instance);
             var leafCount = Catalog.Instance.Keys.Count;
 
             // 每个叶子 id 都必须取到非空字符串
             for (var i = 0; i < leafCount; i++)
             {
-                var value = localizer.Get(i);
+                var value = Localizer.Get(i);
                 Assert.False(string.IsNullOrEmpty(value), "id " + i + " 取到空值");
             }
         }
@@ -189,17 +189,19 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void CultureSwitch_ChangesValuesById()
         {
-            var localizer = new Localizer(Catalog.Instance, System.Globalization.CultureInfo.GetCultureInfo("en-US"));
+            Localizer.Install(Catalog.Instance, System.Globalization.CultureInfo.GetCultureInfo("en-US"));
 
-            var en = localizer.Get(LocalizationIds.Scalar);
-            localizer.SetCulture(System.Globalization.CultureInfo.GetCultureInfo("zh-CN"));
-            var zh = localizer.Get(LocalizationIds.Scalar);
+            var en = Localizer.Get(LocalizationIds.Scalar);
+            Localizer.SetCulture(System.Globalization.CultureInfo.GetCultureInfo("zh-CN"));
+            var zh = Localizer.Get(LocalizationIds.Scalar);
 
             Assert.Equal("e01-scalar", en);
             Assert.Equal("v01-scalar", zh);
         }
     }
 }
+
+
 
 
 

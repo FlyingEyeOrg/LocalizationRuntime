@@ -224,12 +224,12 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void EveryLeafIdIsReadableAndEveryContainerIdIsNot()
         {
-            var localizer = new Localizer(Catalog.Instance);
+            Localizer.Install(Catalog.Instance);
             var leafCount = Catalog.Instance.Keys.Count;
 
             for (var i = 0; i < leafCount; i++)
             {
-                Assert.False(string.IsNullOrEmpty(localizer.Get(i)), "叶子 " + i + " 取到空值");
+                Assert.False(string.IsNullOrEmpty(Localizer.Get(i)), "叶子 " + i + " 取到空值");
             }
 
             var ids = new HashSet<int>();
@@ -237,7 +237,7 @@ namespace LocalizationRuntime.Tests
 
             foreach (var id in ids.Where(v => v >= leafCount))
             {
-                Assert.Throws<ArgumentOutOfRangeException>(() => localizer.Get(id));
+                Assert.Throws<ArgumentOutOfRangeException>(() => Localizer.Get(id));
             }
         }
 
@@ -273,3 +273,5 @@ namespace LocalizationRuntime.Tests
         }
     }
 }
+
+

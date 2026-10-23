@@ -86,11 +86,11 @@ namespace LocalizationRuntime.Tests
 
             foreach (var culture in Cultures)
             {
-                var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo(culture));
+                Localizer.Install(Catalog.Instance, CultureInfo.GetCultureInfo(culture));
 
                 for (var id = 0; id < leafCount; id++)
                 {
-                    var value = localizer.Get(id);
+                    var value = Localizer.Get(id);
                     Assert.False(
                         string.IsNullOrEmpty(value),
                         culture + " 的 id=" + id + "（键 " + Catalog.Instance.Keys[id] + "）取到空值");
@@ -110,7 +110,7 @@ namespace LocalizationRuntime.Tests
 
             foreach (var culture in Cultures)
             {
-                var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo(culture));
+                Localizer.Install(Catalog.Instance, CultureInfo.GetCultureInfo(culture));
                 var expected = Flatten(culture);
 
                 for (var id = 0; id < keys.Count; id++)
@@ -122,7 +122,7 @@ namespace LocalizationRuntime.Tests
                         continue;
                     }
 
-                    var got = localizer.Get(id);
+                    var got = Localizer.Get(id);
                     if (!string.Equals(got, want, StringComparison.Ordinal))
                     {
                         problems.Add(
@@ -141,20 +141,20 @@ namespace LocalizationRuntime.Tests
         {
             // 测试资源里两种语言的值全部不同，所以每个 id 都必须变化。
             var leafCount = Catalog.Instance.Keys.Count;
-            var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
+            Localizer.Install(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
 
             var before = new string[leafCount];
             for (var id = 0; id < leafCount; id++)
             {
-                before[id] = localizer.Get(id);
+                before[id] = Localizer.Get(id);
             }
 
-            localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
+            Localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
 
             var unchanged = new List<string>();
             for (var id = 0; id < leafCount; id++)
             {
-                if (string.Equals(before[id], localizer.Get(id), StringComparison.Ordinal))
+                if (string.Equals(before[id], Localizer.Get(id), StringComparison.Ordinal))
                 {
                     unchanged.Add("id=" + id + " 键=" + Catalog.Instance.Keys[id]);
                 }
@@ -168,28 +168,38 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void UnknownCultureFallsBackToDefault()
         {
-            var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("de-DE"));
-            var zh = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
+            var leafCount = Catalog.Instance.Keys.Count;
 
-            Assert.Equal("zh-CN", localizer.CurrentCulture.Name);
-
-            for (var id = 0; id < Catalog.Instance.Keys.Count; id++)
+            // 先记录基语言的实际值，再切到不受支持的 de-DE 对比。
+            Localizer.Install(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
+            var expected = new string[leafCount];
+            for (var id = 0; id < leafCount; id++)
             {
-                Assert.Equal(zh.Get(id), localizer.Get(id));
+                expected[id] = Localizer.Get(id);
+            }
+
+            Localizer.Install(Catalog.Instance, CultureInfo.GetCultureInfo("de-DE"));
+
+            // 不受支持的语言应落到基语言，CurrentCulture 与值的来源必须一致。
+            Assert.Equal("zh-CN", Localizer.CurrentCulture.Name);
+
+            for (var id = 0; id < leafCount; id++)
+            {
+                Assert.Equal(expected[id], Localizer.Get(id));
             }
         }
 
         [Fact]
         public void ReSwitchingIsIdempotentForValues()
         {
-            var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
+            Localizer.Install(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
 
-            var first = Enumerable.Range(0, Catalog.Instance.Keys.Count).Select(localizer.Get).ToArray();
+            var first = Enumerable.Range(0, Catalog.Instance.Keys.Count).Select(Localizer.Get).ToArray();
 
-            localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
-            localizer.SetCulture(CultureInfo.GetCultureInfo("zh-CN"));
+            Localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
+            Localizer.SetCulture(CultureInfo.GetCultureInfo("zh-CN"));
 
-            var again = Enumerable.Range(0, Catalog.Instance.Keys.Count).Select(localizer.Get).ToArray();
+            var again = Enumerable.Range(0, Catalog.Instance.Keys.Count).Select(Localizer.Get).ToArray();
 
             Assert.Equal(first, again);
         }
@@ -276,3 +286,6 @@ namespace LocalizationRuntime.Tests
         }
     }
 }
+
+
+

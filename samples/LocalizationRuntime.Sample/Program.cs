@@ -8,142 +8,108 @@ namespace LocalizationRuntime.Sample
     /// <summary>
     /// 演示各种 JSON 形状如何映射成强类型 id：
     ///   标量、嵌套对象、字符串数组、对象数组、二维数组、三维数组、对象里套数组。
+    ///
+    /// 注意 Localizer 是静态类，不需要任何初始化代码：
+    /// 生成的 Catalog 会在模块加载时自动注册。
     /// </summary>
     internal static class Program
     {
         private static int Main()
         {
-            // 生成器已把三种语言编译进程序集；构造 localizer 时按系统 culture 自动选语言。
-            var localizer = new Localizer(Catalog.Instance);
-
-            Console.WriteLine("系统探测语言: " + localizer.CurrentCulture.Name);
+            Console.WriteLine("系统探测语言: " + Localizer.CurrentCulture.Name);
             Console.WriteLine("支持的语言  : " + string.Join(", ", Catalog.Instance.CultureNames));
             Console.WriteLine("键总数      : " + Catalog.Instance.Keys.Count);
             Console.WriteLine();
 
-            Dump(localizer, "初次加载");
+            Dump("初次加载");
 
             // 运行时切换，无需重启、无需读文件
-            localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
-            Dump(localizer, "切到 en-US");
+            Localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
+            Dump("切到 en-US");
 
-            localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
-            Dump(localizer, "切到 ja-JP（Common.Cancel 未翻译，回退到 zh-CN）");
+            Localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
+            Dump("切到 ja-JP（Common.Cancel 未翻译，回退到 zh-CN）");
 
-            // 切回中文：同一个 Localizer 实例，再读就是中文
-            localizer.SetCulture(CultureInfo.GetCultureInfo("zh-CN"));
-            Console.WriteLine("切回 zh-CN: App.Title = " + localizer.Get(LocalizationIds.AppObject.Title));
+            // 切回中文
+            Localizer.SetCulture(CultureInfo.GetCultureInfo("zh-CN"));
+            Console.WriteLine("切回 zh-CN: App.Title = " + Localizer.Get(LocalizationIds.AppObject.Title));
             Console.WriteLine();
 
             // 幂等：同语言不递增版本号
-            var revisionBefore = localizer.Revision;
-            var changed = localizer.SetCulture(CultureInfo.GetCultureInfo("zh-CN"));
+            var revisionBefore = Localizer.Revision;
+            var changed = Localizer.SetCulture(CultureInfo.GetCultureInfo("zh-CN"));
             Console.WriteLine("重复切同一语言: 返回 " + changed + "，版本号 " +
-                              revisionBefore + " → " + localizer.Revision);
+                              revisionBefore + " → " + Localizer.Revision);
 
             return 0;
         }
 
-        private static void Dump(Localizer l, string title)
+        private static void Dump(string title)
         {
             Console.WriteLine("=== " + title + " ===");
-            Console.WriteLine("culture          : " + l.CurrentCulture.Name);
+            Console.WriteLine("culture          : " + Localizer.CurrentCulture.Name);
 
             // ① 标量
-            Console.WriteLine("App.Title        : " + l.Get(LocalizationIds.AppObject.Title));
+            Console.WriteLine("App.Title        : " + Localizer.Get(LocalizationIds.AppObject.Title));
             Console.WriteLine("App.ConfirmDelete: " +
-                string.Format(l.CurrentCulture, l.Get(LocalizationIds.AppObject.ConfirmDelete), "刀具 A"));
+                string.Format(Localizer.CurrentCulture, Localizer.Get(LocalizationIds.AppObject.ConfirmDelete), "刀具 A"));
 
             // ② 多层嵌套对象
-            Console.WriteLine("MainWindow.Title : " + l.Get(LocalizationIds.MainWindowObject.Title));
-            Console.WriteLine("ToolInfo.UserName: " + l.Get(LocalizationIds.MainWindowObject.ToolInfoObject.UserName));
+            Console.WriteLine("MainWindow.Title : " + Localizer.Get(LocalizationIds.MainWindowObject.Title));
+            Console.WriteLine("ToolInfo.UserName: " + Localizer.Get(LocalizationIds.MainWindowObject.ToolInfoObject.UserName));
             Console.WriteLine("Dept.Name        : " +
-                l.Get(LocalizationIds.MainWindowObject.ToolInfoObject.DepartmentObject.Name));
+                Localizer.Get(LocalizationIds.MainWindowObject.ToolInfoObject.DepartmentObject.Name));
 
             // ③ 字符串数组
-            Console.Write("MainWindow.Tabs  : ");
-            Console.WriteLine(string.Join(" | ", new[]
-            {
-                l.Get(LocalizationIds.MainWindowObject.TabsObject.TabsItem0),
-                l.Get(LocalizationIds.MainWindowObject.TabsObject.TabsItem1),
-                l.Get(LocalizationIds.MainWindowObject.TabsObject.TabsItem2)
-            }));
+            Console.WriteLine("MainWindow.Tabs  : " +
+                string.Join(" | ", Localizer.GetValues(LocalizationIds.MainWindowObject.Tabs)));
 
             // ④ 对象数组
             Console.WriteLine("Menus[0]         : " +
-                l.Get(LocalizationIds.MenusObject.MenusItem0Object.Title) + " / " +
-                l.Get(LocalizationIds.MenusObject.MenusItem0Object.Shortcut));
+                Localizer.Get(LocalizationIds.MenusObject.MenusItem0Object.Title) + " / " +
+                Localizer.Get(LocalizationIds.MenusObject.MenusItem0Object.Shortcut));
             Console.WriteLine("Menus[2]         : " +
-                l.Get(LocalizationIds.MenusObject.MenusItem2Object.Title) + " / " +
-                l.Get(LocalizationIds.MenusObject.MenusItem2Object.Shortcut));
+                Localizer.Get(LocalizationIds.MenusObject.MenusItem2Object.Title) + " / " +
+                Localizer.Get(LocalizationIds.MenusObject.MenusItem2Object.Shortcut));
 
             // ⑤ 二维数组（数组套数组）
-            Console.Write("Matrix           : ");
-            Console.WriteLine(string.Join(" | ", new[]
-            {
-                l.Get(LocalizationIds.MatrixObject.MatrixItem0Object.MatrixItem0Item0),
-                l.Get(LocalizationIds.MatrixObject.MatrixItem0Object.MatrixItem0Item1),
-                l.Get(LocalizationIds.MatrixObject.MatrixItem1Object.MatrixItem1Item0)
-            }));
+            Console.WriteLine("Matrix           : " +
+                string.Join(" | ", Localizer.GetAllValues(LocalizationIds.Matrix)));
 
-            // ⑥ 三维数组（数组套数组套数组）
-            Console.Write("Cube             : ");
-            Console.WriteLine(string.Join(" | ", new[]
-            {
-                l.Get(LocalizationIds.CubeObject.CubeItem0Object.CubeItem0Item0Object.CubeItem0Item0Item0),
-                l.Get(LocalizationIds.CubeObject.CubeItem0Object.CubeItem0Item1Object.CubeItem0Item1Item0),
-                l.Get(LocalizationIds.CubeObject.CubeItem1Object.CubeItem1Item0Object.CubeItem1Item0Item0)
-            }));
+            // ⑥ 三维数组
+            Console.WriteLine("Cube             : " +
+                string.Join(" | ", Localizer.GetAllValues(LocalizationIds.Cube)));
 
             // ⑦ 二维对象数组
-            Console.Write("Grid             : ");
-            Console.WriteLine(string.Join(" | ", new[]
-            {
-                l.Get(LocalizationIds.GridObject.GridItem0Object.GridItem0Item0Object.Header),
-                l.Get(LocalizationIds.GridObject.GridItem0Object.GridItem0Item1Object.Header),
-                l.Get(LocalizationIds.GridObject.GridItem1Object.GridItem1Item0Object.Header)
-            }));
+            Console.WriteLine("Grid             : " +
+                string.Join(" | ", Localizer.GetAllValues(LocalizationIds.Grid)));
 
             // ⑧ 对象里套数组
-            Console.WriteLine("Groups[0].Name   : " + l.Get(LocalizationIds.GroupsObject.GroupsItem0Object.Name));
-            Console.Write("Groups[0].Items  : ");
-            Console.WriteLine(string.Join(" | ", new[]
-            {
-                l.Get(LocalizationIds.GroupsObject.GroupsItem0Object.ItemsObject.ItemsItem0),
-                l.Get(LocalizationIds.GroupsObject.GroupsItem0Object.ItemsObject.ItemsItem1)
-            }));
+            Console.WriteLine("Groups[0].Name   : " + Localizer.Get(LocalizationIds.GroupsObject.GroupsItem0Object.Name));
+            Console.WriteLine("Groups[0].Items  : " +
+                string.Join(" | ", Localizer.GetValues(LocalizationIds.GroupsObject.GroupsItem0Object.Items)));
 
             // ⑨ 回退：ja-JP 没有 Cancel，应显示 zh-CN 的"取消"
-            Console.WriteLine("Common.Cancel    : " + l.Get(LocalizationIds.CommonObject.Cancel));
-            Console.WriteLine();
+            Console.WriteLine("Common.Cancel    : " + Localizer.Get(LocalizationIds.CommonObject.Cancel));
 
-            // ⑩ 容器 id：取整个数组、按层展开、拍平
+            // ⑩ 容器 id：取整个数组、按层展开
             Console.WriteLine("-- 容器（数组/对象）--");
-            Console.WriteLine("Tabs 元素数      : " + l.GetChildCount(LocalizationIds.MainWindowObject.Tabs));
-            Console.WriteLine("Tabs 全部        : " +
-                string.Join(" | ", l.GetValues(LocalizationIds.MainWindowObject.Tabs)));
-
-            Console.WriteLine("Menus 元素数     : " + l.GetChildCount(LocalizationIds.Menus));
-            foreach (var itemId in l.GetChildren(LocalizationIds.Menus))
+            Console.WriteLine("Tabs 元素数      : " + Localizer.GetChildCount(LocalizationIds.MainWindowObject.Tabs));
+            Console.WriteLine("Menus 元素数     : " + Localizer.GetChildCount(LocalizationIds.Menus));
+            foreach (var itemId in Localizer.GetChildren(LocalizationIds.Menus))
             {
                 Console.WriteLine("  Menus 元素 id=" + itemId +
-                                  " 子成员数=" + l.GetChildCount(itemId));
+                                  " 子成员数=" + Localizer.GetChildCount(itemId));
             }
 
-            Console.WriteLine("Matrix 行数      : " + l.GetChildCount(LocalizationIds.Matrix));
-            foreach (var rowId in l.GetChildren(LocalizationIds.Matrix))
+            Console.WriteLine("Matrix 行数      : " + Localizer.GetChildCount(LocalizationIds.Matrix));
+            foreach (var rowId in Localizer.GetChildren(LocalizationIds.Matrix))
             {
-                Console.WriteLine("  行: " + string.Join(" | ", l.GetValues(rowId)));
+                Console.WriteLine("  行: " + string.Join(" | ", Localizer.GetValues(rowId)));
             }
 
-            Console.WriteLine("Matrix 拍平      : " +
-                string.Join(" | ", l.GetAllValues(LocalizationIds.Matrix)));
-            Console.WriteLine("Cube 拍平        : " +
-                string.Join(" | ", l.GetAllValues(LocalizationIds.Cube)));
-            Console.WriteLine("App 成员数       : " + l.GetChildCount(LocalizationIds.App));
+            Console.WriteLine("App 成员数       : " + Localizer.GetChildCount(LocalizationIds.App));
             Console.WriteLine();
         }
     }
 }
-
-
