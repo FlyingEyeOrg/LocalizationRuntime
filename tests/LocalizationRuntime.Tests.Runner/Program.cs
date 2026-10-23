@@ -15,6 +15,18 @@ namespace LocalizationRuntime.Tests.Runner
     {
         private static int Main()
         {
+            // 可选：用环境变量强制 UI 语言，用来复现 CI（en-US）与本地（zh-CN）
+            // 下的行为差异。取值应为 culture 名，例如 en-US。
+            var forcedUiCulture = Environment.GetEnvironmentVariable("LOCALIZATION_TEST_UI_CULTURE");
+            if (!string.IsNullOrWhiteSpace(forcedUiCulture))
+            {
+                var culture = System.Globalization.CultureInfo.GetCultureInfo(forcedUiCulture!);
+                System.Globalization.CultureInfo.CurrentUICulture = culture;
+                System.Globalization.CultureInfo.CurrentCulture = culture;
+                Console.WriteLine("（UI 语言已被强制为 " + culture.Name + "）");
+                Console.WriteLine();
+            }
+
             var assembly = typeof(LocalizerTests).Assembly;
             var facts = new List<(Type Type, MethodInfo Method)>();
 

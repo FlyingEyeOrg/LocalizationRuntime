@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using LocalizationRuntime.Tests.Localization;
@@ -245,7 +246,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void EveryLeafIdIsReadableAndEveryContainerIdIsNot()
         {
-            var l = new Localizer(Catalog.Instance);
+            var l = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
 
             var TextCount = LocalizationIds.TextCount;
 

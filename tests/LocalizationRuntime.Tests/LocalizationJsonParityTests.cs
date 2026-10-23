@@ -87,7 +87,7 @@ namespace LocalizationRuntime.Tests
         /// </summary>
         private static Dictionary<string, int> FlattenIds()
         {
-            var localizer = new Localizer(Catalog.Instance);
+            var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
 
             // 值 → JSON 路径
             var byValue = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -202,7 +202,7 @@ namespace LocalizationRuntime.Tests
             Dictionary<string, string> expected,
             List<string> sink)
         {
-            var children = new Localizer(Catalog.Instance).GetChildren(containerId);
+            var children = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN")).GetChildren(containerId);
 
             // 子节点全是容器 → 是数组，下标按顺序编；否则是对象，用键名。
             var allLeaves = children.All(c => c < leafCount);
@@ -214,7 +214,7 @@ namespace LocalizationRuntime.Tests
                 if (childId < leafCount)
                 {
                     // 没有键路径可查，改用值反查：测试资源的值全局唯一。
-                    var value = new Localizer(Catalog.Instance).Get(childId);
+                    var value = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN")).Get(childId);
                     Assert.True(value.Length > 0, "id=" + childId + " 取到空值");
 
                     sink.Add(value);
@@ -246,7 +246,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void EveryTopLevelContainerFlattensToItsJsonValues()
         {
-            var l = new Localizer(Catalog.Instance);
+            var l = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
 
 
             foreach (var pair in TopLevelContainers())

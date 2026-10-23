@@ -143,7 +143,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void SwitchingCultureChangesEveryValue()
         {
-            var l = new Localizer(Catalog.Instance);
+            var l = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
             // 测试资源里两种语言的值全部不同，所以每个 id 都必须变化。
             var TextCount = LocalizationIds.TextCount;
             var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
@@ -173,7 +173,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void UnknownCultureFallsBackToDefault()
         {
-            var l = new Localizer(Catalog.Instance);
+            var l = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
             var TextCount = LocalizationIds.TextCount;
 
             // 先记录基语言的实际值，再切到不受支持的 de-DE 对比。
