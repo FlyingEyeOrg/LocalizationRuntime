@@ -21,7 +21,7 @@ namespace LocalizationRuntime
     /// 读者只会看到完整的旧值或完整的新值，不会读到撕裂的中间态。
     /// 切换无 IO，因此是同步的。
     /// </summary>
-    public sealed class Localizer
+    public sealed class Localizer : ILocalizer
     {
         private sealed class Snapshot
         {

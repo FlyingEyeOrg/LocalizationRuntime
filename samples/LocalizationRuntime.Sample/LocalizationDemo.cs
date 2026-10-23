@@ -6,7 +6,7 @@ using LocalizationRuntime.Sample.Localization;
 namespace LocalizationRuntime.Sample
 {
     /// <summary>
-    /// 业务服务：构造函数直接声明 <see cref="Localizer"/>，由 DI 容器注入，
+    /// 业务服务：构造函数声明的是 <see cref="ILocalizer"/> 接口，由 DI 容器注入，
     /// 不需要自己 new，也不需要知道 Catalog 的存在。
     ///
     /// 这里演示各种 JSON 形状如何映射成强类型 id：
@@ -14,9 +14,9 @@ namespace LocalizationRuntime.Sample
     /// </summary>
     internal sealed class LocalizationDemo
     {
-        private readonly Localizer _localizer;
+        private readonly ILocalizer _localizer;
 
-        public LocalizationDemo(Localizer localizer)
+        public LocalizationDemo(ILocalizer localizer)
         {
             _localizer = localizer ?? throw new ArgumentNullException(nameof(localizer));
         }

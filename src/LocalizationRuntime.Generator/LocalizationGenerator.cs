@@ -446,6 +446,10 @@ namespace LocalizationRuntime.Generator
             sb.AppendLine("                sp.GetRequiredService<global::LocalizationRuntime.ILocalizationCatalog>(),");
             sb.AppendLine("                initialCulture));");
             sb.AppendLine();
+            sb.AppendLine("        // 业务代码依赖 ILocalizer 而不是具体类型；两者解析到同一个实例。");
+            sb.AppendLine("        services.TryAddSingleton<global::LocalizationRuntime.ILocalizer>(");
+            sb.AppendLine("            sp => sp.GetRequiredService<global::LocalizationRuntime.Localizer>());");
+            sb.AppendLine();
             sb.AppendLine("        return services;");
             sb.AppendLine("    }");
             sb.AppendLine("}");

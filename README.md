@@ -32,12 +32,12 @@ ASP.NET Core 风格的容器可以直接接入。注册之后，任何在构造�
 // ① 注册，唯一一步，不需要传任何东西
 builder.Services.AddLocalizationRuntime();
 
-// ② 业务服务只声明需要什么
+// ② 业务服务只声明需要什么——依赖的是接口，不是具体类型
 public sealed class OrderService
 {
-    private readonly Localizer _localizer;
+    private readonly ILocalizer _localizer;
 
-    public OrderService(Localizer localizer) => _localizer = localizer;
+    public OrderService(ILocalizer localizer) => _localizer = localizer;
 
     public string Title => _localizer.Get(LocalizationIds.AppObject.Title);
 }
@@ -45,6 +45,9 @@ public sealed class OrderService
 
 注册方法本身也是生成器产出的：它和 `Catalog` 同属你的程序集，因此直接使用
 `Catalog.Instance`，调用方既不用传 catalog，也不用知道它存在。
+
+业务代码只依赖 `ILocalizer`：换实现、写单元测试替身都不牵动调用方。
+`Localizer` 与 `ILocalizer` 解析到同一个实例。
 
 `Localizer` 注册为**单例**：当前语言是进程级状态，`SetCulture` 对所有调用方生效。
 这与库的设计一致——没有按请求隔离的语言，也就没有 `AsyncLocal`、没有隐藏的状态传递。
