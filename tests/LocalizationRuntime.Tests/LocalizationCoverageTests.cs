@@ -69,7 +69,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void EveryCultureHasTheSameKeySet()
         {
-            var l = new Localizer(Catalog.Instance);
+
             var zh = Flatten("zh-CN");
             var en = Flatten("en-US");
 
@@ -83,7 +83,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void EveryLeafIdIsNonEmptyInEveryCulture()
         {
-            var l = new Localizer(Catalog.Instance);
+
             var TextCount = LocalizationIds.TextCount;
 
             foreach (var culture in Cultures)
@@ -196,7 +196,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void ReSwitchingIsIdempotentForValues()
         {
-            var l = new Localizer(Catalog.Instance);
+
             var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
 
             var first = Enumerable.Range(0, LocalizationIds.TextCount).Select(localizer.Get).ToArray();
@@ -218,7 +218,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void ConstantTreeCoversEveryNonLeafNode()
         {
-            var l = new Localizer(Catalog.Instance);
+
             var TextCount = LocalizationIds.TextCount;
 
             var json = File.ReadAllText(ResourcePath("zh-CN"));

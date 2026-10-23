@@ -265,7 +265,7 @@ namespace LocalizationRuntime.Tests
         public void ContainerApis_FollowCultureSwitch()
         {
             var l = Zh();
-            var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
+
             var before = l.GetValues(LocalizationIds.StrArr);
 
             l.SetCulture(CultureInfo.GetCultureInfo("en-US"));

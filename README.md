@@ -3,25 +3,20 @@
 编译期固化多语言资源的 .NET 本地化运行时。运行时**不加载任何资源文件、不做 JSON 解析**，只做一次数组索引。
 
 ```csharp
-// 不需要任何初始化：生成的 Catalog 在模块加载时自动注册
-Localizer.Get(LocalizationIds.AppObject.Title);     // "退刀管控系统"
-Localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
-Localizer.Get(LocalizationIds.AppObject.Title);     // "Tool Retraction Control"
+// 唯一的准备工作：把生成好的 catalog 交给 Localizer
+var localizer = new Localizer(Catalog.Instance);
+
+localizer.Get(LocalizationIds.AppObject.Title);     // "退刀管控系统"
+localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
+localizer.Get(LocalizationIds.AppObject.Title);     // "Tool Retraction Control"
 
 // 容器也能取：整个数组、元素个数、递归拍平
-Localizer.GetValues(LocalizationIds.MainWindowObject.Tabs);   // ["换刀", "设备信息", ...]
-Localizer.GetChildCount(LocalizationIds.Menus);               // 3
-Localizer.GetAllValues(LocalizationIds.Matrix);               // ["A1", "A2", "B1"]
+localizer.GetValues(LocalizationIds.MainWindowObject.Tabs);   // ["换刀", "设备信息", ...]
+localizer.GetChildCount(LocalizationIds.Menus);               // 3
+localizer.GetAllValues(LocalizationIds.Matrix);               // ["A1", "A2", "B1"]
 ```
 
 核心只有两件事：**按 id 取当前语言的值**，**设置当前语言**。
-
-```csharp
-var localizer = new Localizer(Catalog.Instance);
-
-localizer.Get(LocalizationIds.AppObject.Title);     // 编译期 id，最快
-localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
-```
 
 全部按 id 取值，字符串键路径不对外暴露——`LocalizationIds` 已经把每一条文本都编成了常量。
 
@@ -67,6 +62,10 @@ localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
 ```csharp
 public static class LocalizationIds        // 键 → 编译期 id，结构与 JSON 层级一致
 {
+    // 叶子 id 的个数：0..TextCount-1 可取文本，再往上是容器。
+    // 容器 id 从它开始编号，所以它的值和第一个容器 id 相同——两者含义不同，别混用。
+    public const int TextCount = 14;
+
     // 容器 id：数组与对象本身也有 id，能取整段
     public const int Menus = 21;
     public const int Data = 14;
@@ -127,7 +126,7 @@ internal sealed class GeneratedCatalog  // 每语言一个 string?[]（未翻译
 容器没有文本，所以传给 `Get` 会抛异常——这能在编译期挡住「把数组当字符串用」。
 
 ```csharp
-string title = Localizer.Get(LocalizationIds.AppObject.Title);   // 单值
+string title = localizer.Get(LocalizationIds.AppObject.Title);   // 单值
 ```
 
 ## 容器：取整个数组
@@ -136,25 +135,25 @@ string title = Localizer.Get(LocalizationIds.AppObject.Title);   // 单值
 
 ```csharp
 // 元素个数
-int n = Localizer.GetChildCount(LocalizationIds.Menus);          // 3
+int n = localizer.GetChildCount(LocalizationIds.Menus);          // 3
 
 // 一维字符串数组：一次取全部
-string[] tabs = Localizer.GetValues(LocalizationIds.MainWindowObject.Tabs);
+string[] tabs = localizer.GetValues(LocalizationIds.MainWindowObject.Tabs);
 
 // 对象数组：先拿子 id，再逐个展开
-foreach (int itemId in Localizer.GetChildren(LocalizationIds.Menus))
+foreach (int itemId in localizer.GetChildren(LocalizationIds.Menus))
 {
-    Console.WriteLine(Localizer.GetChildCount(itemId));          // 该元素的成员数
+    Console.WriteLine(localizer.GetChildCount(itemId));          // 该元素的成员数
 }
 
 // 二维数组：按层取，顺序严格等于下标顺序
-foreach (int rowId in Localizer.GetChildren(LocalizationIds.Matrix))
+foreach (int rowId in localizer.GetChildren(LocalizationIds.Matrix))
 {
-    Console.WriteLine(string.Join(" | ", Localizer.GetValues(rowId)));
+    Console.WriteLine(string.Join(" | ", localizer.GetValues(rowId)));
 }
 
 // 任意深度：递归拍平成一条
-string[] all = Localizer.GetAllValues(LocalizationIds.Cube);
+string[] all = localizer.GetAllValues(LocalizationIds.Cube);
 ```
 
 | 方法 | 用途 |
@@ -172,11 +171,11 @@ string[] all = Localizer.GetAllValues(LocalizationIds.Cube);
 
 ```csharp
 // 控制台 / 服务：直接再读一次
-Localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
-Console.WriteLine(Localizer.Get(LocalizationIds.AppObject.Title));
+localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
+Console.WriteLine(localizer.Get(LocalizationIds.AppObject.Title));
 
 // WPF：切语言后自行触发一次重读，例如重新查询 VM 的属性
-Localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
+localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
 viewModel.ReloadTexts();
 ```
 
@@ -205,12 +204,26 @@ ja-JP → ja → 基语言
 | LR1006 | Warning | 某语言缺键（运行期回退） |
 | LR1007 | Error | 占位符与基语言不一致 |
 | LR1008 | Warning | 值为空字符串 |
+| LR1010 | Error | 空对象或空数组 |
+| LR1011 | Error | 值必须是非 null 字符串 |
+| LR1012 | Error | 键名不能包含点号 |
+| LR1013 | Error | 数组元素类型必须一致 |
+| LR1014 | Error | 键名不是合法的 C# 标识符 |
 
-严重度可在 `.editorconfig` 里覆盖：
+抑制与升级用两个 MSBuild 属性，逗号或分号分隔多个 ID：
 
-```ini
-dotnet_diagnostic.LR1006.severity = error
+```xml
+<PropertyGroup>
+  <!-- 让该诊断不再出现 -->
+  <LocalizationSuppressedDiagnostics>LR1006</LocalizationSuppressedDiagnostics>
+  <!-- 把警告升级为错误 -->
+  <LocalizationDiagnosticsAsErrors>LR1008</LocalizationDiagnosticsAsErrors>
+</PropertyGroup>
 ```
+
+注意**不能用** `.editorconfig` 的 `dotnet_diagnostic.LR1006.severity`：源生成器通过
+`SourceProductionContext.ReportDiagnostic` 上报的诊断不会经过编译器的诊断过滤层，
+那条配置传不到生成器里（实测确认）。这是上面改用 MSBuild 属性的原因。
 
 ## 可配置的 MSBuild 属性
 

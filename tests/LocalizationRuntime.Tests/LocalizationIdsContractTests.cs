@@ -81,7 +81,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void EveryClassEndsWithObjectSuffix()
         {
-            var l = new Localizer(Catalog.Instance);
+
             var offenders = new List<string>();
 
             Walk(Root(), node =>
@@ -109,7 +109,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void PlainObjectsAlsoGetTheirOwnId()
         {
-            var l = new Localizer(Catalog.Instance);
+
             var offenders = new List<string>();
 
             Walk(Root(), node =>
@@ -142,7 +142,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void EveryNonLeafNodeHasAnIdConstantNextToItsClass()
         {
-            var l = new Localizer(Catalog.Instance);
+
             // 关键契约：容器既有常量又有类。
             // App 有 AppObject 类，就必须有 App = N 这个常量；数组和元素同理。
             var offenders = new List<string>();
@@ -170,7 +170,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void IdConstantsNeverCarryObjectSuffix()
         {
-            var l = new Localizer(Catalog.Instance);
+
             var offenders = new List<string>();
 
             Walk(Root(), node =>
@@ -189,10 +189,15 @@ namespace LocalizationRuntime.Tests
                 "以下 int 常量不应带 Object 后缀: " + string.Join(", ", offenders));
         }
 
+        /// <summary>
+        /// 全部 id 必须从 0 开始连续、无重复、无空洞。连续即蕴含唯一。
+        ///
+        /// 回归背景：曾经父循环和递归各分配一次 id，导致 40、41 这类编号被吞掉，
+        /// 表面上能用，但容器区间出现空洞、总数对不上。
+        /// </summary>
         [Fact]
         public void AllIds_AreUniqueAndContiguousFromZero()
         {
-            var l = new Localizer(Catalog.Instance);
             var ids = new List<int>();
             Walk(Root(), node => ids.AddRange(node.Constants.Select(c => c.Value)));
 
@@ -215,7 +220,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void LeafIdsComeFirstThenContainerIds()
         {
-            var l = new Localizer(Catalog.Instance);
+
             var TextCount = LocalizationIds.TextCount;
 
             var ids = new List<int>();
@@ -237,7 +242,7 @@ namespace LocalizationRuntime.Tests
         public void EveryLeafIdIsReadableAndEveryContainerIdIsNot()
         {
             var l = new Localizer(Catalog.Instance);
-            var localizer = new Localizer(Catalog.Instance);
+
             var TextCount = LocalizationIds.TextCount;
 
             for (var i = 0; i < TextCount; i++)
@@ -257,7 +262,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void ArrayElementNamesContainItemKeyword()
         {
-            var l = new Localizer(Catalog.Instance);
+
             var offenders = new List<string>();
 
             Walk(Root(), node =>

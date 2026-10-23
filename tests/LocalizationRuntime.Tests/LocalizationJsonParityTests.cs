@@ -147,7 +147,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void EveryLeafIdHasAJsonOrigin()
         {
-            var l = new Localizer(Catalog.Instance);
+
             var ids = FlattenIds();
             var jsonKeys = FlattenJson("zh-CN").Keys.ToHashSet(StringComparer.Ordinal);
 
@@ -165,7 +165,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void WalkingContainersReachesExactlyTheSubtreeLeaves()
         {
-            var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
+
             var leafCount = LocalizationIds.TextCount;
             var expected = FlattenJson("zh-CN");
 
@@ -247,7 +247,7 @@ namespace LocalizationRuntime.Tests
         public void EveryTopLevelContainerFlattensToItsJsonValues()
         {
             var l = new Localizer(Catalog.Instance);
-            var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
+
 
             foreach (var pair in TopLevelContainers())
             {

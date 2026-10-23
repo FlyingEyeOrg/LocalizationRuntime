@@ -958,32 +958,6 @@ namespace LocalizationRuntime.Generator
             return char.IsDigit(result[0]) ? "_" + result : result;
         }
 
-        /// <summary>
-        /// 把点分键路径转成嵌套静态类的访问路径，与 <see cref="KeyNode.Add"/> 保持一致：
-        ///   App.Title          → App.Title
-        ///   MainWindow.Tabs.0  → MainWindow.Tabs_0
-        /// </summary>
-        private static string KeyAccessPath(string path)
-        {
-            var segments = path.Split('.');
-            var sb = new StringBuilder(path.Length + 8);
-
-            for (var i = 0; i < segments.Length; i++)
-            {
-                var segment = segments[i];
-
-                if (sb.Length > 0)
-                {
-                    sb.Append('.');
-                }
-
-                // 与 KeyNode.Add 保持一致：数字段 → Item{N}
-                sb.Append(IsAllDigits(segment) ? "Item" + segment : Sanitize(segment));
-            }
-
-            return sb.ToString();
-        }
-
         private static string Literal(string value)
         {
             var sb = new StringBuilder(value.Length + 2);

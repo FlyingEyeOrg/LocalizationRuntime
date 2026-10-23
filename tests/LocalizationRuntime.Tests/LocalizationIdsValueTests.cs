@@ -206,7 +206,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void TextCountMatchesResource()
         {
-            var l = Zh();
+
             Assert.Equal(ExpectedTextCount, LocalizationIds.TextCount);
         }
     }
