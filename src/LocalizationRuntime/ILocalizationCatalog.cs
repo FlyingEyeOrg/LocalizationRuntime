@@ -33,10 +33,11 @@ namespace LocalizationRuntime
         int[] GetChildren(int id);
 
         /// <summary>
-        /// 取某语言的原始表，长度等于 <see cref="TextCount"/>，缺键位置为 null。
+        /// 取某语言的全部文本值：长度等于 <see cref="TextCount"/>，下标即键 id，
+        /// 该语言未翻译的位置为 null。
         /// 该语言不存在时返回 null。返回的数组只读，调用方不得修改。
         /// </summary>
-        string?[]? GetTable(string cultureName);
+        string?[]? GetTextValues(string cultureName);
     }
 }
 

@@ -809,19 +809,19 @@ namespace LocalizationRuntime.Generator
 
             for (var i = 0; i < model.Cultures.Length; i++)
             {
-                EmitTable(sb, model.Cultures[i], i);
+                EmitTextValues(sb, model.Cultures[i], i);
             }
 
-            sb.AppendLine("    public string?[]? GetTable(string cultureName)");
+            sb.AppendLine("    public string?[]? GetTextValues(string cultureName)");
             sb.AppendLine("    {");
-            sb.AppendLine("        string?[]? t;");
+            sb.AppendLine("        string?[]? values;");
             sb.AppendLine("        switch (cultureName)");
             sb.AppendLine("        {");
             for (var i = 0; i < model.Cultures.Length; i++)
             {
                 sb.Append("            case ");
                 sb.Append(Literal(model.Cultures[i].Name));
-                sb.Append(": t = Table");
+                sb.Append(": values = TextValues");
                 sb.Append(i.ToString(CultureInfo.InvariantCulture));
                 sb.AppendLine("; break;");
             }
@@ -829,7 +829,7 @@ namespace LocalizationRuntime.Generator
             sb.AppendLine("            default: return null;");
             sb.AppendLine("        }");
             sb.AppendLine();
-            sb.AppendLine("        if (t != null) return t;");
+            sb.AppendLine("        if (values != null) return values;");
             sb.AppendLine();
             sb.AppendLine("        switch (cultureName)");
             sb.AppendLine("        {");
@@ -838,9 +838,9 @@ namespace LocalizationRuntime.Generator
                 var suffix = i.ToString(CultureInfo.InvariantCulture);
                 sb.Append("            case ");
                 sb.Append(Literal(model.Cultures[i].Name));
-                sb.Append(": return Table");
+                sb.Append(": return TextValues");
                 sb.Append(suffix);
-                sb.AppendLine(" = CreateTable" + suffix + "();");
+                sb.AppendLine(" = CreateTextValues" + suffix + "();");
             }
 
             sb.AppendLine("            default: return null;");
@@ -853,14 +853,14 @@ namespace LocalizationRuntime.Generator
         }
 
         /// <summary>
-        /// 每语言一张表，惰性创建：只有该语言第一次被请求时才填充数组，
+        /// 每语言一个文本数组，惰性创建：只有该语言第一次被请求时才填充，
         /// 因此启动开销与"当前语言"成正比，而不是与"语言总数"成正比。
         /// 元素多时拆成多个填充方法：单个 IL 方法体上限 64KB。
         /// </summary>
-        private static void EmitTable(StringBuilder sb, CultureTable culture, int cultureIndex)
+        private static void EmitTextValues(StringBuilder sb, CultureTable culture, int cultureIndex)
         {
             var suffix = cultureIndex.ToString(CultureInfo.InvariantCulture);
-            var field = "Table" + suffix;
+            var field = "TextValues" + suffix;
             var values = culture.Values;
             var total = values.Length;
 

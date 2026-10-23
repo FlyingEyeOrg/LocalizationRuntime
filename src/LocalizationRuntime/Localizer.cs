@@ -277,17 +277,17 @@ namespace LocalizationRuntime
         }
 
         /// <summary>
-        /// 沿 Parent 链合并成一张扁平表：ja-JP → ja → 基语言，逐键取第一个非 null 的值。
-        /// 仍然缺失的槽位填入键路径，使热路径无需分支。
+        /// 沿 Parent 链合并成一维文本数组：ja-JP → ja → 基语言，逐 id 取第一个非 null 的值。
+        /// 仍然缺失的槽位填空串，使热路径无需分支。
         /// </summary>
         private string[] BuildResolved(string cultureName)
         {
             var length = _catalog.TextCount;
 
-            // 基语言本身：补齐空槽即可，无需逐键走链
+            // 基语言本身：补齐空槽即可，无需逐 id 走链
             if (string.Equals(cultureName, _catalog.DefaultCultureName, StringComparison.OrdinalIgnoreCase))
             {
-                return Materialize(_catalog.GetTable(cultureName), length);
+                return Materialize(_catalog.GetTextValues(cultureName), length);
             }
 
             var chain = BuildChain(cultureName);
@@ -295,14 +295,14 @@ namespace LocalizationRuntime
             // 链上只有一层（常见于二级 culture，如 ja-JP 直接命中）
             if (chain.Count == 1)
             {
-                return Materialize(_catalog.GetTable(chain[0]), length);
+                return Materialize(_catalog.GetTextValues(chain[0]), length);
             }
 
-            // 预先取表，避免在内层循环里反复查表
-            var tables = new string?[chain.Count][];
+            // 预先取各语言的文本数组，避免在内层循环里反复查表
+            var textValues = new string?[chain.Count][];
             for (var i = 0; i < chain.Count; i++)
             {
-                tables[i] = _catalog.GetTable(chain[i])!;
+                textValues[i] = _catalog.GetTextValues(chain[i])!;
             }
 
             var result = new string[length];
@@ -311,12 +311,12 @@ namespace LocalizationRuntime
             {
                 var value = (string?)null;
 
-                for (var level = 0; level < tables.Length; level++)
+                for (var level = 0; level < textValues.Length; level++)
                 {
-                    var table = tables[level];
-                    if (table != null && id < table.Length && table[id] != null)
+                    var values = textValues[level];
+                    if (values != null && id < values.Length && values[id] != null)
                     {
-                        value = table[id];
+                        value = values[id];
                         break;
                     }
                 }
@@ -327,14 +327,14 @@ namespace LocalizationRuntime
             return result;
         }
 
-        /// <summary>把一张可能含 null 的原始表补成不含 null 的数组。</summary>
+        /// <summary>把可能含 null 的文本数组补成不含 null 的数组。</summary>
         private string[] Materialize(string?[]? source, int length)
         {
             var result = new string[length];
 
             if (source == null)
             {
-                // 整张表都缺失：全部填空串，热路径不用再判 null。
+                // 该语言的文本数组整体缺失：全部填空串，热路径不用再判 null。
                 for (var i = 0; i < length; i++)
                 {
                     result[i] = string.Empty;

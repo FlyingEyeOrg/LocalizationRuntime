@@ -13,18 +13,18 @@ namespace LocalizationRuntime.Tests
     /// </summary>
     internal sealed class FakeCatalog : ILocalizationCatalog
     {
-        private readonly Dictionary<string, string?[]> _tables;
+        private readonly Dictionary<string, string?[]> _textValues;
 
-        public FakeCatalog(string defaultCulture, params (string Culture, string?[] Values)[] tables)
+        public FakeCatalog(string defaultCulture, params (string Culture, string?[] Values)[] cultures)
         {
             DefaultCultureName = defaultCulture;
             var names = new List<string>();
-            _tables = new Dictionary<string, string?[]>(StringComparer.Ordinal);
+            _textValues = new Dictionary<string, string?[]>(StringComparer.Ordinal);
 
-            foreach (var t in tables)
+            foreach (var culture in cultures)
             {
-                names.Add(t.Culture);
-                _tables[t.Culture] = t.Values;
+                names.Add(culture.Culture);
+                _textValues[culture.Culture] = culture.Values;
             }
 
             names.Sort(StringComparer.Ordinal);
@@ -62,14 +62,14 @@ namespace LocalizationRuntime.Tests
             return (uint)id < (uint)Children.Length ? Children[id] : System.Array.Empty<int>();
         }
 
-        public string?[]? GetTable(string cultureName)
+        public string?[]? GetTextValues(string cultureName)
         {
-            return _tables.TryGetValue(cultureName, out var t) ? t : null;
+            return _textValues.TryGetValue(cultureName, out var values) ? values : null;
         }
     }
 
     /// <summary>
-    /// 运行时语义测试。Localizer 是静态类，因此每个用例先 Install 自己的 catalog。
+    /// 运行时语义测试。Localizer 通过构造函数接收 catalog，每个用例用 FakeCatalog 隔离。
     /// </summary>
     public sealed class LocalizerTests
     {

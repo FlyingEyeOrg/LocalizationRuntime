@@ -100,7 +100,7 @@ public static class LocalizationIds        // 键 → 编译期 id，结构与 J
         }
     }
 }
-internal sealed class GeneratedCatalog  // 每语言一个 string?[]（缺键为 null）+ 父子表
+internal sealed class GeneratedCatalog  // 每语言一个 string?[]（未翻译为 null）+ 父子表
 ```
 
 键的层级与 JSON 完全对应，所以 `MainWindow.UserInfo.UserName` 就是 `LocalizationIds.MainWindowObject.UserInfoObject.UserName`。
@@ -253,13 +253,13 @@ dotnet build -p:LocalizationClassName=Strings
 | `Get(id)` 叶子 | 0.71 ns | 0 B |
 | `GetValues(数组)` 一次取 N 个 | 视 N 而定 | 1 次分配 |
 | `SetCulture`（已缓存） | 0.12 µs | — |
-| 首次切到未缓存语言（含建表） | 3.1 ms | — |
-| **启动**（访问 catalog + 建表） | **8.4 ms** | — |
+| 首次切到未缓存语言（含构建文本数组） | 3.1 ms | — |
+| **启动**（访问 catalog + 构建文本数组） | **8.4 ms** | — |
 
 几个关键点：
 
 - `Get(id)` 是一次快照引用读加一次数组索引，热路径无锁、无字典哈希、零分配。
-- **语言表惰性填充**：只有被请求的语言才建数组，启动时只付当前语言的代价。
+- **文本数组惰性填充**：只有被请求的语言才建数组，启动时只付当前语言的代价。
 - **父子表是编译期常量**：容器 → 子 id 是一张 `int[][]`，`GetChildren` 退化为一次索引，不建字典。
 - `GetValues` / `GetAllValues` 每次调用分配一个新数组，适合「切语言后重建一次列表」，
   不适合放进逐帧渲染的热路径。
