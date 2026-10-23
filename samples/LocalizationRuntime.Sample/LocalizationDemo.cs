@@ -16,9 +16,27 @@ namespace LocalizationRuntime.Sample
     {
         private readonly ILocalizer _localizer;
 
+        /// <summary>缓存过的标题：切语言时靠通知失效，而不是每次读取都重新拼。</summary>
+        private string? _cachedTitle;
+
         public LocalizationDemo(ILocalizer localizer)
         {
             _localizer = localizer ?? throw new ArgumentNullException(nameof(localizer));
+
+            // 订阅切换通知：这是"缓存过的属性该重读了"的信号。
+            _localizer.CultureChanged += OnCultureChanged;
+        }
+
+        /// <summary>典型场景：属性把文本缓存下来，只在语言变化时失效。</summary>
+        internal string CachedTitle
+        {
+            get { return _cachedTitle ??= _localizer.Get(LocalizationIds.AppObject.Title); }
+        }
+
+        private void OnCultureChanged(object? sender, CultureChangedEventArgs e)
+        {
+            _cachedTitle = null;
+            Console.WriteLine("  [通知] 语言已切换: " + e);
         }
 
         internal void Run()
@@ -28,10 +46,12 @@ namespace LocalizationRuntime.Sample
             Console.WriteLine("叶子数      : " + LocalizationIds.TextCount);
             Console.WriteLine();
 
+            Console.WriteLine("缓存标题（切语言前）: " + CachedTitle);
             Dump("初次加载");
 
             // 运行时切换，无需重启、无需读文件
             _localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
+            Console.WriteLine("缓存标题（切语言后）: " + CachedTitle);
             Dump("切到 en-US");
 
             _localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));

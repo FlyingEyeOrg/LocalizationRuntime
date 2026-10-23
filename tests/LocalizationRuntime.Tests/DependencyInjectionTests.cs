@@ -205,6 +205,13 @@ namespace LocalizationRuntime.Tests
         /// </summary>
         private sealed class StubLocalizer : ILocalizer
         {
+            /// <summary>替身不通知，仅为满足接口。</summary>
+            public event EventHandler<CultureChangedEventArgs>? CultureChanged
+            {
+                add { }
+                remove { }
+            }
+
             public CultureInfo CurrentCulture { get; private set; } =
                 CultureInfo.GetCultureInfo("en-US");
 

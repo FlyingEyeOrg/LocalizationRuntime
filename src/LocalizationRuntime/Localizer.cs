@@ -87,6 +87,13 @@ namespace LocalizationRuntime
             _nextRevision = 1;
         }
 
+        /// <summary>
+        /// 语言切换完成时触发。快照此时已经换好，因此处理函数里取值拿到的已是新语言。
+        ///
+        /// 注意本类是单例：订阅者若是短生命周期对象，务必在销毁时退订。
+        /// </summary>
+        public event EventHandler<CultureChangedEventArgs>? CultureChanged;
+
         /// <summary>当前语言。</summary>
         public CultureInfo CurrentCulture
         {
@@ -227,6 +234,9 @@ namespace LocalizationRuntime
         /// 传入不受支持的语言时，实际生效的是回退链的终点（基语言），
         /// 因此 <see cref="CurrentCulture"/> 报的是真正生效的语言，不会出现
         /// "报 de-DE、值是 zh-CN" 这种自相矛盾的状态。
+        ///
+        /// 切换成功后触发 <see cref="CultureChanged"/>。事件在锁外触发，
+        /// 处理函数里可以安全取值、也可以再次调用本方法；处理函数抛出的异常会向外传播。
         /// </summary>
         public bool SetCulture(CultureInfo culture)
         {
@@ -235,30 +245,45 @@ namespace LocalizationRuntime
                 throw new ArgumentNullException(nameof(culture));
             }
 
+            CultureInfo previous;
+            CultureInfo effective;
+            int revision;
+
             lock (_gate)
             {
                 var snapshot = Volatile.Read(ref _snapshot);
 
-                var current = culture.Name.Length == 0
+                effective = culture.Name.Length == 0
                     ? CultureInfo.GetCultureInfo(_catalog.DefaultCultureName)
                     : culture;
 
                 // 不属于任何受支持语言（含其 Parent 链）时，落到基语言，
                 // 保证 CurrentCulture 与值的来源一致。
-                if (!_supported.Contains(current.Name))
+                if (!_supported.Contains(effective.Name))
                 {
-                    current = CultureInfo.GetCultureInfo(_catalog.DefaultCultureName);
+                    effective = CultureInfo.GetCultureInfo(_catalog.DefaultCultureName);
                 }
 
-                if (string.Equals(snapshot.Culture.Name, current.Name, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(snapshot.Culture.Name, effective.Name, StringComparison.OrdinalIgnoreCase))
                 {
                     return false;
                 }
 
-                var revision = _nextRevision++;
-                Volatile.Write(ref _snapshot, new Snapshot(Resolve(current.Name), current, revision));
-                return true;
+                previous = snapshot.Culture;
+                revision = _nextRevision++;
+                Volatile.Write(ref _snapshot, new Snapshot(Resolve(effective.Name), effective, revision));
             }
+
+            // 出锁再通知：快照此时已经是新语言，订阅者读到的一致；
+            // 也不会因为某个订阅者慢而拖住别的线程切语言。
+            // 没有订阅者时连事件参数都不必分配。
+            var handler = CultureChanged;
+            if (handler != null)
+            {
+                handler(this, new CultureChangedEventArgs(previous, effective, revision));
+            }
+
+            return true;
         }
 
         private CultureInfo DetectSystemCulture()

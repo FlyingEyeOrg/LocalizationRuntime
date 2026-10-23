@@ -20,8 +20,8 @@ localizer.GetAllValues(LocalizationIds.Matrix);               // ["A1", "A2", "B
 
 全部按 id 取值，字符串键路径不对外暴露——`LocalizationIds` 已经把每一条文本都编成了常量。
 
-没有通知、没有订阅、没有弱引用。切语言后再次取值自然就是新语言的值——
-谁需要刷新界面，谁负责在切语言后重新读取。
+切语言后再次取值自然就是新语言的值；缓存过文本的地方订阅 `CultureChanged` 即可知道该重读。
+没有弱引用、没有登记表——只有一个普通事件，订阅与退订由调用方负责。
 
 ## 依赖注入
 
@@ -225,20 +225,43 @@ string[] all = localizer.GetAllValues(LocalizationIds.Cube);
 
 ## 切语言后如何刷新界面
 
-库不提供通知机制。切语言后，再次读取就是新值——刷新由调用方决定：
+切语言后再次读取就是新值。如果某处把文本缓存了下来，订阅 `CultureChanged`
+即可知道该失效重读：
 
 ```csharp
-// 控制台 / 服务：直接再读一次
-localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
-Console.WriteLine(localizer.Get(LocalizationIds.AppObject.Title));
+public sealed class HeaderViewModel
+{
+    private readonly ILocalizer _localizer;
+    private string? _cachedTitle;
 
-// WPF：切语言后自行触发一次重读，例如重新查询 VM 的属性
+    public HeaderViewModel(ILocalizer localizer)
+    {
+        _localizer = localizer;
+        _localizer.CultureChanged += OnCultureChanged;
+    }
+
+    public string Title => _cachedTitle ??= _localizer.Get(LocalizationIds.AppObject.Title);
+
+    private void OnCultureChanged(object? sender, CultureChangedEventArgs e)
+    {
+        _cachedTitle = null;      // 下次读取时按新语言重建
+    }
+}
+```
+
+事件在快照换好之后、锁外触发，所以处理函数里取值已经是新语言，
+也可以放心地在里面再切一次语言。参数带 `OldCulture` / `NewCulture` / `Revision`，
+`Revision` 可用于判断事件是否比上次处理的更新。
+
+订阅的代价要自己承担：`Localizer` 是单例，**短生命周期的订阅者必须在销毁时退订**，
+否则会被单例长期持有。只读文本、不缓存的调用方不必订阅，直接读就是新值。
+
+不想订阅也可以，把刷新时机交给调用方：
+
+```csharp
 localizer.SetCulture(CultureInfo.GetCultureInfo("ja-JP"));
 viewModel.ReloadTexts();
 ```
-
-这样做的原因：通知机制要么强制表持有响应对象（会导致泄漏，需要弱引用和压缩逻辑），
-要么强制每处绑定手写订阅。把刷新时机交给调用方，核心保持无状态、无登记、无生命周期管理。
 
 ## 回退
 
@@ -333,9 +356,7 @@ dotnet build -p:LocalizationDefaultCulture=en-US
 - **父子表是编译期常量**：容器 → 子 id 是一张 `int[][]`，`GetChildren` 退化为一次索引，不建字典。
 - `GetValues` / `GetAllValues` 每次调用分配一个新数组，适合「切语言后重建一次列表」，
   不适合放进逐帧渲染的热路径。
-- `SetCulture` 只做一次快照替换，不遍历、不分配。
-
-`SetCulture` 只做一次受支持性哈希查找和一次快照替换，不遍历、不分配。
+- `SetCulture` 只做一次受支持性哈希查找加一次快照替换；没有订阅者时不分配事件参数。
 
 ## 测试
 

@@ -13,6 +13,14 @@ namespace LocalizationRuntime
     /// </summary>
     public interface ILocalizer
     {
+        /// <summary>
+        /// 语言切换完成时触发。快照此时已经换好，因此处理函数里取值拿到的已是新语言。
+        ///
+        /// 典型用法是刷新那些缓存了文本的属性。注意本类是单例：
+        /// 订阅者若是短生命周期对象，务必在销毁时退订，否则会被单例长期持有。
+        /// </summary>
+        event EventHandler<CultureChangedEventArgs>? CultureChanged;
+
         /// <summary>当前语言。</summary>
         CultureInfo CurrentCulture { get; }
 
