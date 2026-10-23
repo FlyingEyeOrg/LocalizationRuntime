@@ -76,9 +76,9 @@ namespace LocalizationRuntime.Tests
     /// </summary>
     public sealed class LocalizerTests
     {
-        private static void Use(FakeCatalog catalog, string culture)
+        private static Localizer Use(FakeCatalog catalog, string culture)
         {
-            Localizer.Install(catalog, CultureInfo.GetCultureInfo(culture));
+            return new Localizer(catalog, CultureInfo.GetCultureInfo(culture));
         }
 
         private static FakeCatalog CreateCatalog()
@@ -94,98 +94,98 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void GetById_ReturnsValueForRequestedCulture()
         {
-            Use(CreateCatalog(), "en-US");
+            var l = Use(CreateCatalog(), "en-US");
 
-            Assert.Equal("Hello", Localizer.Get(0));
-            Assert.Equal("One", Localizer.Get(1));
+            Assert.Equal("Hello", l.Get(0));
+            Assert.Equal("One", l.Get(1));
         }
 
         [Fact]
         public void GetByKey_ReturnsSameValueAsById()
         {
-            Use(CreateCatalog(), "en-US");
+            var l = Use(CreateCatalog(), "en-US");
 
-            Assert.Equal(Localizer.Get(0), Localizer.Get("Hello"));
-            Assert.Equal("Two", Localizer.Get("Tabs.1"));
+            Assert.Equal(l.Get(0), l.Get("Hello"));
+            Assert.Equal("Two", l.Get("Tabs.1"));
         }
 
         [Fact]
         public void GetByKey_UnknownKey_ReturnsKeyItself()
         {
-            Use(CreateCatalog(), "en-US");
+            var l = Use(CreateCatalog(), "en-US");
 
-            Assert.Equal("No.Such.Key", Localizer.Get("No.Such.Key"));
+            Assert.Equal("No.Such.Key", l.Get("No.Such.Key"));
         }
 
         [Fact]
         public void Get_FallsBackPerKey_ToDefaultCulture()
         {
-            Use(CreateCatalog(), "ja-JP");
+            var l = Use(CreateCatalog(), "ja-JP");
 
             // 自身有值
-            Assert.Equal("こんにちは", Localizer.Get(0));
+            Assert.Equal("こんにちは", l.Get(0));
             // Tabs.1 为 null，回退到基语言
-            Assert.Equal("二", Localizer.Get(2));
+            Assert.Equal("二", l.Get(2));
             // About.Body 为 null，回退到基语言
-            Assert.Equal("内容 {0}", Localizer.Get(4));
+            Assert.Equal("内容 {0}", l.Get(4));
         }
 
         [Fact]
         public void Get_UnknownCulture_FallsBackToDefault()
         {
-            Use(CreateCatalog(), "de-DE");
+            var l = Use(CreateCatalog(), "de-DE");
 
-            Assert.Equal("你好", Localizer.Get(0));
-            Assert.Equal("zh-CN", Localizer.CurrentCulture.Name);
+            Assert.Equal("你好", l.Get(0));
+            Assert.Equal("zh-CN", l.CurrentCulture.Name);
         }
 
         [Fact]
         public void Get_OutOfRangeId_Throws()
         {
-            Use(CreateCatalog(), "en-US");
+            var l = Use(CreateCatalog(), "en-US");
 
-            Assert.Throws<ArgumentOutOfRangeException>(() => Localizer.Get(-1));
-            Assert.Throws<ArgumentOutOfRangeException>(() => Localizer.Get(99));
+            Assert.Throws<ArgumentOutOfRangeException>(() => l.Get(-1));
+            Assert.Throws<ArgumentOutOfRangeException>(() => l.Get(99));
         }
 
         [Fact]
         public void SetCulture_SameCulture_ReturnsFalseAndKeepsRevision()
         {
-            Use(CreateCatalog(), "zh-CN");
+            var l = Use(CreateCatalog(), "zh-CN");
 
-            var before = Localizer.Revision;
-            Assert.False(Localizer.SetCulture(CultureInfo.GetCultureInfo("zh-CN")));
-            Assert.Equal(before, Localizer.Revision);
+            var before = l.Revision;
+            Assert.False(l.SetCulture(CultureInfo.GetCultureInfo("zh-CN")));
+            Assert.Equal(before, l.Revision);
         }
 
         [Fact]
         public void SetCulture_Switch_IncrementsRevision()
         {
-            Use(CreateCatalog(), "zh-CN");
+            var l = Use(CreateCatalog(), "zh-CN");
 
-            var before = Localizer.Revision;
-            Assert.True(Localizer.SetCulture(CultureInfo.GetCultureInfo("en-US")));
-            Assert.Equal(before + 1, Localizer.Revision);
+            var before = l.Revision;
+            Assert.True(l.SetCulture(CultureInfo.GetCultureInfo("en-US")));
+            Assert.Equal(before + 1, l.Revision);
         }
 
         [Fact]
         public void SetCulture_ThenGet_ReturnsNewLanguageValue()
         {
-            Use(CreateCatalog(), "zh-CN");
-            Assert.Equal("你好", Localizer.Get(0));
+            var l = Use(CreateCatalog(), "zh-CN");
+            Assert.Equal("你好", l.Get(0));
 
-            Localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
-            Assert.Equal("Hello", Localizer.Get(0));
+            l.SetCulture(CultureInfo.GetCultureInfo("en-US"));
+            Assert.Equal("Hello", l.Get(0));
         }
 
         [Fact]
         public void SetCulture_UnknownCulture_LandsOnDefault()
         {
-            Use(CreateCatalog(), "en-US");
+            var l = Use(CreateCatalog(), "en-US");
 
-            Assert.True(Localizer.SetCulture(CultureInfo.GetCultureInfo("de-DE")));
-            Assert.Equal("zh-CN", Localizer.CurrentCulture.Name);
-            Assert.Equal("你好", Localizer.Get(0));
+            Assert.True(l.SetCulture(CultureInfo.GetCultureInfo("de-DE")));
+            Assert.Equal("zh-CN", l.CurrentCulture.Name);
+            Assert.Equal("你好", l.Get(0));
         }
 
         // ── 容器 ──
@@ -193,50 +193,50 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void GetChildCount_ReturnsZeroForLeaf()
         {
-            Use(CreateCatalog(), "en-US");
-            Assert.Equal(0, Localizer.GetChildCount(0));
+            var l = Use(CreateCatalog(), "en-US");
+            Assert.Equal(0, l.GetChildCount(0));
         }
 
         [Fact]
         public void GetChildCount_ReturnsArrayLength()
         {
-            Use(CreateCatalog(), "en-US");
-            Assert.Equal(2, Localizer.GetChildCount(5));   // Tabs
-            Assert.Equal(2, Localizer.GetChildCount(6));   // About
+            var l = Use(CreateCatalog(), "en-US");
+            Assert.Equal(2, l.GetChildCount(5));   // Tabs
+            Assert.Equal(2, l.GetChildCount(6));   // About
         }
 
         [Fact]
         public void GetChildren_ReturnsChildIds()
         {
-            Use(CreateCatalog(), "en-US");
+            var l = Use(CreateCatalog(), "en-US");
 
-            var tabs = Localizer.GetChildren(5);
+            var tabs = l.GetChildren(5);
             Assert.Equal(new[] { 1, 2 }, tabs);
 
-            var about = Localizer.GetChildren(6);
+            var about = l.GetChildren(6);
             Assert.Equal(new[] { 3, 4 }, about);
         }
 
         [Fact]
         public void GetValues_ReturnsAllTexts()
         {
-            Use(CreateCatalog(), "en-US");
-            Assert.Equal(new[] { "One", "Two" }, Localizer.GetValues(5));
+            var l = Use(CreateCatalog(), "en-US");
+            Assert.Equal(new[] { "One", "Two" }, l.GetValues(5));
         }
 
         [Fact]
         public void GetAllValues_FlattensObject()
         {
-            Use(CreateCatalog(), "en-US");
-            Assert.Equal(new[] { "About", "Body {0}" }, Localizer.GetAllValues(6));
+            var l = Use(CreateCatalog(), "en-US");
+            Assert.Equal(new[] { "About", "Body {0}" }, l.GetAllValues(6));
         }
 
         [Fact]
         public void GetChildren_OutOfRange_IsEmpty()
         {
-            Use(CreateCatalog(), "en-US");
-            Assert.Empty(Localizer.GetChildren(999));
-            Assert.Empty(Localizer.GetChildren(-1));
+            var l = Use(CreateCatalog(), "en-US");
+            Assert.Empty(l.GetChildren(999));
+            Assert.Empty(l.GetChildren(-1));
         }
 
         // ── 并发 ──
@@ -244,7 +244,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void Concurrent_SetCulture_EndsInOneOfTheRequestedCultures()
         {
-            Use(CreateCatalog(), "zh-CN");
+            var l = Use(CreateCatalog(), "zh-CN");
 
             var cultures = new[]
             {
@@ -261,7 +261,7 @@ namespace LocalizationRuntime.Tests
                 {
                     for (var n = 0; n < 2000; n++)
                     {
-                        Localizer.SetCulture(cultures[(index + n) % cultures.Length]);
+                        l.SetCulture(cultures[(index + n) % cultures.Length]);
                     }
                 });
                 threads[i].Start();
@@ -272,7 +272,7 @@ namespace LocalizationRuntime.Tests
                 t.Join();
             }
 
-            var final = Localizer.CurrentCulture.Name;
+            var final = l.CurrentCulture.Name;
             Assert.Contains(final, new[] { "zh-CN", "en-US", "ja-JP" });
         }
 
@@ -286,7 +286,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void Concurrent_ReadWhileSwitching_NeverSeesATornValue()
         {
-            Use(CreateCatalog(), "en-US");
+            var l = Use(CreateCatalog(), "en-US");
 
             var stop = false;
             var bad = 0;
@@ -312,7 +312,7 @@ namespace LocalizationRuntime.Tests
                             continue;
                         }
 
-                        var value = Localizer.Get(id);
+                        var value = l.Get(id);
                         if (!allowed.Contains(value))
                         {
                             // 出现了不属于任何语言的字符串：说明读到了撕裂的中间态
@@ -326,7 +326,7 @@ namespace LocalizationRuntime.Tests
 
             for (var n = 0; n < 3000; n++)
             {
-                Localizer.SetCulture(CultureInfo.GetCultureInfo(n % 2 == 0 ? "zh-CN" : "en-US"));
+                l.SetCulture(CultureInfo.GetCultureInfo(n % 2 == 0 ? "zh-CN" : "en-US"));
             }
 
             Volatile.Write(ref stop, true);
@@ -342,7 +342,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void Concurrent_RepeatedReadOfSameId_IsAlwaysOneOfTheLanguages()
         {
-            Use(CreateCatalog(), "zh-CN");
+            var l = Use(CreateCatalog(), "zh-CN");
 
             var stop = false;
             var bad = 0;
@@ -351,7 +351,7 @@ namespace LocalizationRuntime.Tests
             {
                 while (!Volatile.Read(ref stop))
                 {
-                    var value = Localizer.Get(0);
+                    var value = l.Get(0);
                     if (value != "你好" && value != "Hello")
                     {
                         Interlocked.Increment(ref bad);
@@ -363,7 +363,7 @@ namespace LocalizationRuntime.Tests
 
             for (var n = 0; n < 5000; n++)
             {
-                Localizer.SetCulture(CultureInfo.GetCultureInfo(n % 2 == 0 ? "zh-CN" : "en-US"));
+                l.SetCulture(CultureInfo.GetCultureInfo(n % 2 == 0 ? "zh-CN" : "en-US"));
             }
 
             Volatile.Write(ref stop, true);
@@ -373,3 +373,5 @@ namespace LocalizationRuntime.Tests
         }
     }
 }
+
+

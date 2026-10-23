@@ -15,10 +15,10 @@ namespace LocalizationRuntime.Tests
     /// </summary>
     public sealed class LocalizationContainerTests
     {
-        /// <summary>每个用例先把当前语言设为 zh-CN，然后直接用静态方法。</summary>
-        private static void UseZh()
+        /// <summary>构造一个 zh-CN 的 localizer。</summary>
+        private static Localizer Zh()
         {
-            Localizer.Install(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
+            return new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
         }
 
         // ── 元素个数 ──
@@ -26,18 +26,19 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void GetChildCount_ReturnsArrayLength()
         {
-            UseZh();
+            var l = Zh();
 
-            Assert.Equal(3, Localizer.GetChildCount(LocalizationIds.StrArr));
-            Assert.Equal(1, Localizer.GetChildCount(LocalizationIds.OneStrArr));
-            Assert.Equal(2, Localizer.GetChildCount(LocalizationIds.ObjArr));
-            Assert.Equal(2, Localizer.GetChildCount(LocalizationIds.ArrArr));
+            Assert.Equal(3, l.GetChildCount(LocalizationIds.StrArr));
+            Assert.Equal(1, l.GetChildCount(LocalizationIds.OneStrArr));
+            Assert.Equal(2, l.GetChildCount(LocalizationIds.ObjArr));
+            Assert.Equal(2, l.GetChildCount(LocalizationIds.ArrArr));
         }
 
         [Fact]
         public void GetChildCount_ReturnsZeroForLeaf()
         {
-            Assert.Equal(0, Localizer.GetChildCount(LocalizationIds.Scalar));
+            var l = Zh();
+            Assert.Equal(0, l.GetChildCount(LocalizationIds.Scalar));
         }
 
         // ── 子 id ──
@@ -45,8 +46,8 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void GetChildren_ReturnsElementIdsInOrder()
         {
-            UseZh();
-            var children = Localizer.GetChildren(LocalizationIds.StrArr);
+            var l = Zh();
+            var children = l.GetChildren(LocalizationIds.StrArr);
 
             Assert.Equal(3, children.Length);
             Assert.Equal(LocalizationIds.StrArrObject.StrArrItem0, children[0]);
@@ -57,35 +58,35 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void GetChildren_OfObjectArray_ReturnsElementContainers()
         {
-            UseZh();
-            var children = Localizer.GetChildren(LocalizationIds.ObjArr);
+            var l = Zh();
+            var children = l.GetChildren(LocalizationIds.ObjArr);
 
             Assert.Equal(2, children.Length);
             Assert.Equal(LocalizationIds.ObjArrObject.ObjArrItem0, children[0]);
             Assert.Equal(LocalizationIds.ObjArrObject.ObjArrItem1, children[1]);
 
             // 元素本身是容器，每个有 1 个成员 K
-            Assert.Equal(1, Localizer.GetChildCount(children[0]));
+            Assert.Equal(1, l.GetChildCount(children[0]));
         }
 
         [Fact]
         public void GetChildren_OfNestedArray_StaysHierarchical()
         {
-            UseZh();
+            var l = Zh();
 
-            var rows = Localizer.GetChildren(LocalizationIds.ArrArr);
+            var rows = l.GetChildren(LocalizationIds.ArrArr);
             Assert.Equal(2, rows.Length);
 
             // 行 0 有两个元素，行 1 有一个
-            Assert.Equal(2, Localizer.GetChildCount(rows[0]));
-            Assert.Equal(1, Localizer.GetChildCount(rows[1]));
+            Assert.Equal(2, l.GetChildCount(rows[0]));
+            Assert.Equal(1, l.GetChildCount(rows[1]));
         }
 
         [Fact]
         public void GetChildren_OfPlainObject_ReturnsMemberIds()
         {
-            UseZh();
-            var members = Localizer.GetChildren(LocalizationIds.GroupObject.A == 0 ? LocalizationIds.Group : LocalizationIds.Group);
+            var l = Zh();
+            var members = l.GetChildren(LocalizationIds.GroupObject.A == 0 ? LocalizationIds.Group : LocalizationIds.Group);
 
             // Group 有 A 和 Deep 两个成员，都能取值或继续展开
             Assert.Equal(2, members.Length);
@@ -95,14 +96,16 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void GetChildren_OfLeaf_IsEmpty()
         {
-            Assert.Empty(Localizer.GetChildren(LocalizationIds.Scalar));
+            var l = Zh();
+            Assert.Empty(l.GetChildren(LocalizationIds.Scalar));
         }
 
         [Fact]
         public void GetChildren_OutOfRange_IsEmpty()
         {
-            Assert.Empty(Localizer.GetChildren(999999));
-            Assert.Empty(Localizer.GetChildren(-1));
+            var l = Zh();
+            Assert.Empty(l.GetChildren(999999));
+            Assert.Empty(l.GetChildren(-1));
         }
 
         // ── 取整段文本 ──
@@ -110,7 +113,8 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void GetValues_ReturnsAllStringsOfArray()
         {
-            var values = Localizer.GetValues(LocalizationIds.StrArr);
+            var l = Zh();
+            var values = l.GetValues(LocalizationIds.StrArr);
 
             Assert.Equal(new[] { "v08-strarr-0", "v09-strarr-1", "v10-strarr-2" }, values);
         }
@@ -118,19 +122,20 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void GetValues_OfNestedArrayRow()
         {
-            UseZh();
-            var rows = Localizer.GetChildren(LocalizationIds.ArrArr);
+            var l = Zh();
+            var rows = l.GetChildren(LocalizationIds.ArrArr);
 
-            Assert.Equal(new[] { "v14-arrarr-0-0", "v15-arrarr-0-1" }, Localizer.GetValues(rows[0]));
-            Assert.Equal(new[] { "v16-arrarr-1-0" }, Localizer.GetValues(rows[1]));
+            Assert.Equal(new[] { "v14-arrarr-0-0", "v15-arrarr-0-1" }, l.GetValues(rows[0]));
+            Assert.Equal(new[] { "v16-arrarr-1-0" }, l.GetValues(rows[1]));
         }
 
         [Fact]
         public void GetValues_OfObjectArray_Throws()
         {
+            var l = Zh();
             // 元素是对象，没有直接文本；应引导调用方改用 GetChildren。
             var ex = Assert.Throws<InvalidOperationException>(
-                () => Localizer.GetValues(LocalizationIds.ObjArr));
+                () => l.GetValues(LocalizationIds.ObjArr));
 
             Assert.Contains("GetChildren", ex.Message);
         }
@@ -138,7 +143,8 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void GetValues_OfLeaf_IsEmpty()
         {
-            Assert.Empty(Localizer.GetValues(LocalizationIds.Scalar));
+            var l = Zh();
+            Assert.Empty(l.GetValues(LocalizationIds.Scalar));
         }
 
         // ── 拍平 ──
@@ -146,7 +152,8 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void GetAllValues_FlattensNestedArray()
         {
-            var all = Localizer.GetAllValues(LocalizationIds.ArrArr);
+            var l = Zh();
+            var all = l.GetAllValues(LocalizationIds.ArrArr);
 
             Assert.Equal(
                 new[] { "v14-arrarr-0-0", "v15-arrarr-0-1", "v16-arrarr-1-0" },
@@ -156,7 +163,8 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void GetAllValues_FlattensThreeDimensionalArray()
         {
-            var all = Localizer.GetAllValues(LocalizationIds.Cube);
+            var l = Zh();
+            var all = l.GetAllValues(LocalizationIds.Cube);
 
             Assert.Equal(
                 new[] { "v23-cube-0-0-0", "v24-cube-0-1-0", "v25-cube-1-0-0" },
@@ -166,7 +174,8 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void GetAllValues_FlattensObjectArray()
         {
-            var all = Localizer.GetAllValues(LocalizationIds.ObjArr);
+            var l = Zh();
+            var all = l.GetAllValues(LocalizationIds.ObjArr);
 
             Assert.Equal(new[] { "v12-objarr-0-k", "v13-objarr-1-k" }, all);
         }
@@ -174,8 +183,8 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void GetAllValues_IsStableAndCoversEveryLeaf()
         {
-            UseZh();
-            var all = Localizer.GetAllValues(LocalizationIds.DeepObjArr);
+            var l = Zh();
+            var all = l.GetAllValues(LocalizationIds.DeepObjArr);
 
             // 对象成员的顺序由键的排序决定（与生成的常量顺序一致），
             // 不保证等于 JSON 原文顺序；但必须是确定的、且不漏元素。
@@ -187,22 +196,21 @@ namespace LocalizationRuntime.Tests
             Assert.Contains("v34-deepobjarr-0-inner-1-y", all);
 
             // 同一实例内重复调用结果一致
-            Assert.Equal(all, Localizer.GetAllValues(LocalizationIds.DeepObjArr));
+            Assert.Equal(all, l.GetAllValues(LocalizationIds.DeepObjArr));
         }
 
         [Fact]
         public void GetAllValues_OfArray_PreservesElementOrder()
         {
-            // 数组顺序必须严格等于下标顺序，这一点不能含糊。
-            UseZh();
+            var l = Zh();
 
             Assert.Equal(
                 new[] { "v14-arrarr-0-0", "v15-arrarr-0-1", "v16-arrarr-1-0" },
-                Localizer.GetAllValues(LocalizationIds.ArrArr));
+                l.GetAllValues(LocalizationIds.ArrArr));
 
             Assert.Equal(
                 new[] { "v08-strarr-0", "v09-strarr-1", "v10-strarr-2" },
-                Localizer.GetAllValues(LocalizationIds.StrArr));
+                l.GetAllValues(LocalizationIds.StrArr));
         }
 
         // ── 与叶子 API 的一致性 ──
@@ -210,7 +218,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void EveryChildIdOfArrayIsReadable()
         {
-            UseZh();
+            var l = Zh();
 
             foreach (var arrayId in new[]
                      {
@@ -221,19 +229,19 @@ namespace LocalizationRuntime.Tests
                          LocalizationIds.DeepObjArr,
                      })
             {
-                foreach (var childId in Localizer.GetChildren(arrayId))
+                foreach (var childId in l.GetChildren(arrayId))
                 {
-                    Assert.NotEqual(0, Localizer.GetChildCount(childId) + (childId < Catalog.Instance.Keys.Count ? 1 : 0));
+                    Assert.NotEqual(0, l.GetChildCount(childId) + (childId < Catalog.Instance.Keys.Count ? 1 : 0));
 
                     // 子 id 要么可取文本，要么可继续展开，不能两者皆无
                     var isLeaf = childId < Catalog.Instance.Keys.Count;
                     if (isLeaf)
                     {
-                        Assert.False(string.IsNullOrEmpty(Localizer.Get(childId)));
+                        Assert.False(string.IsNullOrEmpty(l.Get(childId)));
                     }
                     else
                     {
-                        Assert.NotEmpty(Localizer.GetChildren(childId));
+                        Assert.NotEmpty(l.GetChildren(childId));
                     }
                 }
             }
@@ -242,25 +250,26 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void GetValues_AgreesWithGetById()
         {
-            UseZh();
+            var l = Zh();
 
-            var values = Localizer.GetValues(LocalizationIds.StrArr);
-            var children = Localizer.GetChildren(LocalizationIds.StrArr);
+            var values = l.GetValues(LocalizationIds.StrArr);
+            var children = l.GetChildren(LocalizationIds.StrArr);
 
             for (var i = 0; i < children.Length; i++)
             {
-                Assert.Equal(Localizer.Get(children[i]), values[i]);
+                Assert.Equal(l.Get(children[i]), values[i]);
             }
         }
 
         [Fact]
         public void ContainerApis_FollowCultureSwitch()
         {
-            Localizer.Install(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
-            var before = Localizer.GetValues(LocalizationIds.StrArr);
+            var l = Zh();
+            var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
+            var before = l.GetValues(LocalizationIds.StrArr);
 
-            Localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
-            var after = Localizer.GetValues(LocalizationIds.StrArr);
+            l.SetCulture(CultureInfo.GetCultureInfo("en-US"));
+            var after = l.GetValues(LocalizationIds.StrArr);
 
             Assert.Equal(new[] { "v08-strarr-0", "v09-strarr-1", "v10-strarr-2" }, before);
             Assert.Equal(new[] { "e08-strarr-0", "e09-strarr-1", "e10-strarr-2" }, after);
@@ -269,16 +278,21 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void FlattenedCount_MatchesLeafCountOfSubtree()
         {
-            UseZh();
+            var l = Zh();
 
             // Cube 有 3 个叶子，拍平后正好 3 个
-            Assert.Equal(3, Localizer.GetAllValues(LocalizationIds.Cube).Length);
+            Assert.Equal(3, l.GetAllValues(LocalizationIds.Cube).Length);
 
             // Grid 有 4 个叶子（2 行 × 每行 1 个格子 × 2 字段）
-            Assert.Equal(4, Localizer.GetAllValues(LocalizationIds.Grid).Length);
+            Assert.Equal(4, l.GetAllValues(LocalizationIds.Grid).Length);
         }
     }
 }
+
+
+
+
+
 
 
 

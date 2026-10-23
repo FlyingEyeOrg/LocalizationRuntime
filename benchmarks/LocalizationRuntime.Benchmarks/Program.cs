@@ -19,7 +19,7 @@ namespace LocalizationRuntime.Benchmarks
             // ---- 启动成本：客户端最敏感的一段 ----
             var swStartup = Stopwatch.StartNew();
             var catalog = Catalog.Instance;                // 触发 GeneratedCatalog 的静态构造
-            Localizer.SetCulture(CultureInfo.GetCultureInfo("zh-CN"));
+            var localizer = new Localizer(catalog, CultureInfo.GetCultureInfo("zh-CN"));
             swStartup.Stop();
 
             Console.WriteLine("========== 启动 ==========");
@@ -31,7 +31,7 @@ namespace LocalizationRuntime.Benchmarks
 
             // 首次解析一张未缓存的语言表（模拟切到从未用过的语言）
             var swFirstSwitch = Stopwatch.StartNew();
-            Localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
+            localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
             swFirstSwitch.Stop();
             Console.WriteLine("首次切到未缓存语言: " +
                               swFirstSwitch.Elapsed.TotalMilliseconds.ToString("N3", CultureInfo.InvariantCulture) + " ms");
@@ -41,11 +41,11 @@ namespace LocalizationRuntime.Benchmarks
             Console.WriteLine();
 
             // 预热，避免把 JIT 时间算进去
-            RunGetById(1_000_000);
-            RunGetByKey(200_000);
+            RunGetById(localizer, 1_000_000);
+            RunGetByKey(localizer, 200_000);
 
-            Measure("Get(id) 命中", Iterations, () => RunGetById(Iterations));
-            Measure("Get(string) 命中", Iterations / 4, () => RunGetByKey(Iterations / 4));
+            Measure("Get(id) 命中", Iterations, () => RunGetById(localizer, Iterations));
+            Measure("Get(string) 命中", Iterations / 4, () => RunGetByKey(localizer, Iterations / 4));
 
             var switches = 200_000;
             var cultures = new[]
@@ -58,7 +58,7 @@ namespace LocalizationRuntime.Benchmarks
             var sw = Stopwatch.StartNew();
             for (var i = 0; i < switches; i++)
             {
-                Localizer.SetCulture(cultures[i % 3]);
+                localizer.SetCulture(cultures[i % 3]);
             }
 
             sw.Stop();
@@ -67,25 +67,25 @@ namespace LocalizationRuntime.Benchmarks
                               " µs");
         }
 
-        private static void RunGetById(int n)
+        private static void RunGetById(Localizer localizer, int n)
         {
             var sink = 0;
             var id = LocalizationIds.CommonObject.Key0;
 
             for (var i = 0; i < n; i++)
             {
-                sink ^= Localizer.Get(id).Length;
+                sink ^= localizer.Get(id).Length;
             }
 
             Sink = sink;
         }
 
-        private static void RunGetByKey(int n)
+        private static void RunGetByKey(Localizer localizer, int n)
         {
             var sink = 0;
             for (var i = 0; i < n; i++)
             {
-                sink ^= Localizer.Get("Common.Key1").Length;
+                sink ^= localizer.Get("Common.Key1").Length;
             }
 
             Sink = sink;
@@ -115,6 +115,7 @@ namespace LocalizationRuntime.Benchmarks
         private static int Sink;
     }
 }
+
 
 
 

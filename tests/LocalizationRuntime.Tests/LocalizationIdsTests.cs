@@ -51,6 +51,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void LeafIds_CoverContiguousRangeStartingAtZero()
         {
+            var l = new Localizer(Catalog.Instance);
             var catalog = Catalog.Instance;
             var leafCount = catalog.Keys.Count;
 
@@ -69,6 +70,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void ContainerIds_AreUniqueAndDisjointFromLeaves()
         {
+            var l = new Localizer(Catalog.Instance);
             var leafCount = Catalog.Instance.Keys.Count;
 
             var containers = AllIds()
@@ -88,6 +90,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void EveryId_IsGloballyUnique()
         {
+            var l = new Localizer(Catalog.Instance);
             var all = AllIds();
 
             var duplicates = all
@@ -102,6 +105,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void AllIds_FormAContiguousRangeWithoutHoles()
         {
+            var l = new Localizer(Catalog.Instance);
             // 回归：曾经父循环和递归各分配一次 id，导致 40、41 这类编号被吞掉，
             // 表面上能用，但容器区间出现空洞、总数对不上。
             var all = AllIds().Values.OrderBy(v => v).ToArray();
@@ -119,6 +123,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void ContainerIdsAreAllocatedOnce_NoDuplicatedSpans()
         {
+            var l = new Localizer(Catalog.Instance);
             var leafCount = Catalog.Instance.Keys.Count;
             var all = AllIds();
 
@@ -140,6 +145,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void ScalarKeys_MapToTheirSortedIndex()
         {
+            var l = new Localizer(Catalog.Instance);
             var catalog = Catalog.Instance;
 
             var ids = AllIds();
@@ -156,8 +162,9 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void ContainerId_IsNotReadableAsText()
         {
+            var l = new Localizer(Catalog.Instance);
             var leafCount = Catalog.Instance.Keys.Count;
-            Localizer.Install(Catalog.Instance);
+            var localizer = new Localizer(Catalog.Instance);
 
             // 容器 id 落在叶子区间之外，取值必须抛异常，从而挡住误用
             var containerId = AllIds().Values.Where(v => v >= leafCount).DefaultIfEmpty(-1).Max();
@@ -167,7 +174,7 @@ namespace LocalizationRuntime.Tests
                 return; // 没有数组，跳过
             }
 
-            Assert.Throws<ArgumentOutOfRangeException>(() => Localizer.Get(containerId));
+            Assert.Throws<ArgumentOutOfRangeException>(() => l.Get(containerId));
         }
 
 
@@ -175,13 +182,14 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void Localizer_ReturnsActualTextForEveryLeaf()
         {
-            Localizer.Install(Catalog.Instance);
+            var l = new Localizer(Catalog.Instance);
+            var localizer = new Localizer(Catalog.Instance);
             var leafCount = Catalog.Instance.Keys.Count;
 
             // 每个叶子 id 都必须取到非空字符串
             for (var i = 0; i < leafCount; i++)
             {
-                var value = Localizer.Get(i);
+                var value = l.Get(i);
                 Assert.False(string.IsNullOrEmpty(value), "id " + i + " 取到空值");
             }
         }
@@ -189,17 +197,20 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void CultureSwitch_ChangesValuesById()
         {
-            Localizer.Install(Catalog.Instance, System.Globalization.CultureInfo.GetCultureInfo("en-US"));
+            var localizer = new Localizer(
+                Catalog.Instance, System.Globalization.CultureInfo.GetCultureInfo("en-US"));
 
-            var en = Localizer.Get(LocalizationIds.Scalar);
-            Localizer.SetCulture(System.Globalization.CultureInfo.GetCultureInfo("zh-CN"));
-            var zh = Localizer.Get(LocalizationIds.Scalar);
+            var en = localizer.Get(LocalizationIds.Scalar);
+            localizer.SetCulture(System.Globalization.CultureInfo.GetCultureInfo("zh-CN"));
+            var zh = localizer.Get(LocalizationIds.Scalar);
 
             Assert.Equal("e01-scalar", en);
             Assert.Equal("v01-scalar", zh);
         }
     }
 }
+
+
 
 
 

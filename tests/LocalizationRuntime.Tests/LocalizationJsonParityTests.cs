@@ -88,7 +88,7 @@ namespace LocalizationRuntime.Tests
         /// </summary>
         private static Dictionary<string, int> FlattenIds()
         {
-            Localizer.Install(Catalog.Instance);
+            var localizer = new Localizer(Catalog.Instance);
             var keys = Catalog.Instance.Keys;
 
             var result = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -112,7 +112,7 @@ namespace LocalizationRuntime.Tests
 
             foreach (var culture in Cultures)
             {
-                Localizer.Install(Catalog.Instance, CultureInfo.GetCultureInfo(culture));
+                var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo(culture));
                 var expected = FlattenJson(culture);
 
                 foreach (var pair in expected)
@@ -124,7 +124,7 @@ namespace LocalizationRuntime.Tests
                         continue;
                     }
 
-                    var got = Localizer.Get(id);
+                    var got = localizer.Get(id);
                     if (!string.Equals(got, pair.Value, StringComparison.Ordinal))
                     {
                         problems.Add(
@@ -142,6 +142,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void EveryLeafIdHasAJsonOrigin()
         {
+            var l = new Localizer(Catalog.Instance);
             var ids = FlattenIds();
             var jsonKeys = FlattenJson("zh-CN").Keys.ToHashSet(StringComparer.Ordinal);
 
@@ -159,7 +160,8 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void WalkingContainersReachesExactlyTheSubtreeLeaves()
         {
-            Localizer.Install(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
+            var l = new Localizer(Catalog.Instance);
+            var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
             var leafCount = Catalog.Instance.Keys.Count;
             var expected = FlattenJson("zh-CN");
 
@@ -194,7 +196,7 @@ namespace LocalizationRuntime.Tests
             Dictionary<string, string> expected,
             List<string> sink)
         {
-            var children = Localizer.GetChildren(containerId);
+            var children = new Localizer(Catalog.Instance).GetChildren(containerId);
 
             // 子节点全是容器 → 是数组，下标按顺序编；否则是对象，用键名。
             var allLeaves = children.All(c => c < leafCount);
@@ -239,12 +241,13 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void EveryTopLevelContainerFlattensToItsJsonValues()
         {
-            Localizer.Install(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
+            var l = new Localizer(Catalog.Instance);
+            var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
 
             foreach (var pair in TopLevelContainers())
             {
                 var prefix = pair.Key;
-                var flattened = Localizer.GetAllValues(pair.Value);
+                var flattened = l.GetAllValues(pair.Value);
 
                 // 期望值：JSON 里该前缀下所有叶子的文本（多重集合比较，顺序不限）
                 var expected = FlattenJson("zh-CN")
@@ -261,6 +264,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void LeafCountEqualsJsonLeafCount()
         {
+            var l = new Localizer(Catalog.Instance);
             foreach (var culture in Cultures)
             {
                 Assert.Equal(
@@ -270,6 +274,9 @@ namespace LocalizationRuntime.Tests
         }
     }
 }
+
+
+
 
 
 

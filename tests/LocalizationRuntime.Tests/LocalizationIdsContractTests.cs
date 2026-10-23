@@ -75,6 +75,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void EveryClassEndsWithObjectSuffix()
         {
+            var l = new Localizer(Catalog.Instance);
             var offenders = new List<string>();
 
             Walk(Root(), node =>
@@ -102,6 +103,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void PlainObjectsAlsoGetTheirOwnId()
         {
+            var l = new Localizer(Catalog.Instance);
             var offenders = new List<string>();
 
             Walk(Root(), node =>
@@ -134,6 +136,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void EveryNonLeafNodeHasAnIdConstantNextToItsClass()
         {
+            var l = new Localizer(Catalog.Instance);
             // 关键契约：容器既有常量又有类。
             // App 有 AppObject 类，就必须有 App = N 这个常量；数组和元素同理。
             var offenders = new List<string>();
@@ -161,6 +164,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void IdConstantsNeverCarryObjectSuffix()
         {
+            var l = new Localizer(Catalog.Instance);
             var offenders = new List<string>();
 
             Walk(Root(), node =>
@@ -182,6 +186,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void AllIds_AreUniqueAndContiguousFromZero()
         {
+            var l = new Localizer(Catalog.Instance);
             var ids = new List<int>();
             Walk(Root(), node => ids.AddRange(node.Constants.Select(c => c.Value)));
 
@@ -204,6 +209,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void LeafIdsComeFirstThenContainerIds()
         {
+            var l = new Localizer(Catalog.Instance);
             var leafCount = Catalog.Instance.Keys.Count;
 
             var ids = new List<int>();
@@ -224,12 +230,13 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void EveryLeafIdIsReadableAndEveryContainerIdIsNot()
         {
-            Localizer.Install(Catalog.Instance);
+            var l = new Localizer(Catalog.Instance);
+            var localizer = new Localizer(Catalog.Instance);
             var leafCount = Catalog.Instance.Keys.Count;
 
             for (var i = 0; i < leafCount; i++)
             {
-                Assert.False(string.IsNullOrEmpty(Localizer.Get(i)), "叶子 " + i + " 取到空值");
+                Assert.False(string.IsNullOrEmpty(l.Get(i)), "叶子 " + i + " 取到空值");
             }
 
             var ids = new HashSet<int>();
@@ -237,13 +244,14 @@ namespace LocalizationRuntime.Tests
 
             foreach (var id in ids.Where(v => v >= leafCount))
             {
-                Assert.Throws<ArgumentOutOfRangeException>(() => Localizer.Get(id));
+                Assert.Throws<ArgumentOutOfRangeException>(() => l.Get(id));
             }
         }
 
         [Fact]
         public void ArrayElementNamesContainItemKeyword()
         {
+            var l = new Localizer(Catalog.Instance);
             var offenders = new List<string>();
 
             Walk(Root(), node =>
@@ -273,5 +281,7 @@ namespace LocalizationRuntime.Tests
         }
     }
 }
+
+
 
 

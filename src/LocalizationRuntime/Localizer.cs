@@ -6,20 +6,22 @@ using System.Threading;
 namespace LocalizationRuntime
 {
     /// <summary>
-    /// 本地化入口（全局唯一）。持有当前语言，按键取值。
+    /// 本地化入口：持有当前语言，按键取值。
     ///
-    /// 数据源由生成器产出的 <c>Catalog</c> 单例提供，并在模块加载时自动注入
-    /// （<c>[ModuleInitializer]</c>），因此调用方无需任何初始化代码：
+    /// 两件事：用 <see cref="Get(int)"/> / <see cref="Get(string)"/> 取当前语言的值，
+    /// 用 <see cref="SetCulture(CultureInfo)"/> 切换语言。切换后再次取值自然得到新语言的值。
+    ///
+    /// 数据通过构造函数注入——生成器在目标程序集里产出的 <c>Catalog.Instance</c>：
     /// <code>
-    /// Localizer.Get(LocalizationIds.AppObject.Title);
-    /// Localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
+    /// var localizer = new Localizer(Catalog.Instance);
+    /// localizer.Get(LocalizationIds.AppObject.Title);
     /// </code>
     ///
     /// 唯一可变的是 <see cref="_snapshot"/> 这一个引用：值数组、culture、版本号一起换，
     /// 读者只会看到完整的旧值或完整的新值，不会读到撕裂的中间态。
     /// 切换无 IO，因此是同步的。
     /// </summary>
-    public static class Localizer
+    public sealed class Localizer
     {
         private sealed class Snapshot
         {
@@ -35,113 +37,71 @@ namespace LocalizationRuntime
             internal readonly int Revision;
         }
 
-        private static readonly object Gate = new object();
+        private readonly ILocalizationCatalog _catalog;
+        private readonly Dictionary<string, int> _index;
+        private readonly HashSet<string> _supported;
+        private readonly Dictionary<string, string[]> _resolved = new Dictionary<string, string[]>(StringComparer.Ordinal);
+        private readonly object _gate = new object();
 
-        private static readonly Dictionary<string, string[]> Resolved =
-            new Dictionary<string, string[]>(StringComparer.Ordinal);
+        private Snapshot _snapshot;
+        private int _nextRevision;
 
-        private static ILocalizationCatalog? _catalog;
-        private static Dictionary<string, int> _index = new Dictionary<string, int>(StringComparer.Ordinal);
-        private static HashSet<string> _supported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        /// <summary>未安装数据源时的占位快照，让 <see cref="Get(int)"/> 能给出明确错误。</summary>
-        private static Snapshot _snapshot =
-            new Snapshot(Array.Empty<string>(), CultureInfo.InvariantCulture, 0);
-
-        private static int _nextRevision;
-
-        /// <summary>数据源是否已就绪。正常情况下模块加载时就已注入。</summary>
-        public static bool IsReady
+        public Localizer(ILocalizationCatalog catalog)
+            : this(catalog, null)
         {
-            get { return Volatile.Read(ref _catalog) != null; }
         }
 
-        /// <summary>
-        /// 安装数据源并重置当前语言。
-        ///
-        /// 由生成器产出的初始化代码在模块加载时调用，业务代码通常不需要直接调用。
-        /// 传入 <paramref name="initialCulture"/> 为 null 时按系统 UI 语言自动选择。
-        /// </summary>
-        public static void Install(ILocalizationCatalog catalog, CultureInfo? initialCulture = null)
+        public Localizer(ILocalizationCatalog catalog, CultureInfo? initialCulture)
         {
-            if (catalog == null)
+            _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+
+            var keys = catalog.Keys;
+            _index = new Dictionary<string, int>(keys.Count, StringComparer.Ordinal);
+            for (var i = 0; i < keys.Count; i++)
             {
-                throw new ArgumentNullException(nameof(catalog));
+                _index[keys[i]] = i;
             }
 
-            lock (Gate)
+            // 把每种受支持语言及其整条 Parent 链都登记进去，
+            // 这样判断"是否受支持"退化为一次哈希查找，不必在 SetCulture 里走链。
+            _supported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < catalog.CultureNames.Count; i++)
             {
-                var keys = catalog.Keys;
+                var name = catalog.CultureNames[i];
+                _supported.Add(name);
 
-                var index = new Dictionary<string, int>(keys.Count, StringComparer.Ordinal);
-                for (var i = 0; i < keys.Count; i++)
+                for (var parent = CultureInfo.GetCultureInfo(name).Parent;
+                     parent != null && !string.IsNullOrEmpty(parent.Name);
+                     parent = parent.Parent)
                 {
-                    index[keys[i]] = i;
+                    _supported.Add(parent.Name);
                 }
-
-                // 把每种受支持语言及其整条 Parent 链都登记进去，
-                // 这样判断"是否受支持"退化为一次哈希查找，不必在 SetCulture 里走链。
-                var supported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                for (var i = 0; i < catalog.CultureNames.Count; i++)
-                {
-                    var name = catalog.CultureNames[i];
-                    supported.Add(name);
-
-                    for (var parent = CultureInfo.GetCultureInfo(name).Parent;
-                         parent != null && !string.IsNullOrEmpty(parent.Name);
-                         parent = parent.Parent)
-                    {
-                        supported.Add(parent.Name);
-                    }
-                }
-
-                // 基语言本身永远算受支持。
-                supported.Add(catalog.DefaultCultureName);
-
-                _catalog = catalog;
-                _index = index;
-                _supported = supported;
-
-                lock (Resolved)
-                {
-                    Resolved.Clear();
-                }
-
-                var culture = initialCulture ?? DetectSystemCulture(catalog, supported);
-
-                // 不受支持的语言落到基语言，否则 CurrentCulture 与值的来源会自相矛盾。
-                if (culture.Name.Length > 0 && !supported.Contains(culture.Name))
-                {
-                    culture = CultureInfo.GetCultureInfo(catalog.DefaultCultureName);
-                }
-
-                _snapshot = new Snapshot(
-                    BuildResolved(catalog, supported, culture.Name), culture, 0);
-                _nextRevision = 1;
-            }
-        }
-
-        private static ILocalizationCatalog CatalogOrThrow()
-        {
-            var catalog = Volatile.Read(ref _catalog);
-            if (catalog == null)
-            {
-                throw new InvalidOperationException(
-                    "本地化数据源尚未安装。正常情况下生成的 ModuleInitializer 会自动完成初始化；" +
-                    "若手动构造了 ILocalizationCatalog，请先调用 Localizer.Install(catalog)。");
             }
 
-            return catalog;
+            // 基语言本身永远算受支持。
+            _supported.Add(catalog.DefaultCultureName);
+
+            var culture = initialCulture ?? DetectSystemCulture();
+
+            // 与 SetCulture 保持一致：不受支持的语言落到基语言，
+            // 否则 CurrentCulture 与值的来源会自相矛盾。
+            if (culture.Name.Length > 0 && !_supported.Contains(culture.Name))
+            {
+                culture = CultureInfo.GetCultureInfo(catalog.DefaultCultureName);
+            }
+
+            _snapshot = new Snapshot(Resolve(culture.Name), culture, 0);
+            _nextRevision = 1;
         }
 
         /// <summary>当前语言。</summary>
-        public static CultureInfo CurrentCulture
+        public CultureInfo CurrentCulture
         {
             get { return Volatile.Read(ref _snapshot).Culture; }
         }
 
         /// <summary>当前快照版本号，每成功切换一次语言递增一次。</summary>
-        public static int Revision
+        public int Revision
         {
             get { return Volatile.Read(ref _snapshot).Revision; }
         }
@@ -149,7 +109,7 @@ namespace LocalizationRuntime
         /// <summary>
         /// 按编译期键 id 取值。热路径：一次快照读 + 一次数组索引，零分配、无锁。
         /// </summary>
-        public static string Get(int id)
+        public string Get(int id)
         {
             var values = Volatile.Read(ref _snapshot).Values;
             if ((uint)id >= (uint)values.Length)
@@ -166,7 +126,7 @@ namespace LocalizationRuntime
         /// 按点分键取值（如 <c>"App.Title"</c>），供拿不到编译期 id 的场景使用。
         /// 键不存在时返回键本身。
         /// </summary>
-        public static string Get(string key)
+        public string Get(string key)
         {
             if (key == null)
             {
@@ -183,9 +143,9 @@ namespace LocalizationRuntime
         /// 取容器的直接子 id 个数。数组返回元素个数；对象返回成员个数；叶子返回 0。
         /// 例如 <c>GetChildCount(LocalizationIds.Menus)</c> 得到菜单项数。
         /// </summary>
-        public static int GetChildCount(int containerId)
+        public int GetChildCount(int containerId)
         {
-            return CatalogOrThrow().GetChildren(containerId).Length;
+            return _catalog.GetChildren(containerId).Length;
         }
 
         /// <summary>
@@ -194,9 +154,9 @@ namespace LocalizationRuntime
         ///
         /// 返回的数组由 catalog 缓存，只读，请勿修改。
         /// </summary>
-        public static int[] GetChildren(int containerId)
+        public int[] GetChildren(int containerId)
         {
-            return CatalogOrThrow().GetChildren(containerId);
+            return _catalog.GetChildren(containerId);
         }
 
         /// <summary>
@@ -204,9 +164,9 @@ namespace LocalizationRuntime
         /// 若元素本身是对象或数组，会抛 <see cref="InvalidOperationException"/>，
         /// 此时应改用 <see cref="GetChildren"/> 逐层展开。
         /// </summary>
-        public static string[] GetValues(int containerId)
+        public string[] GetValues(int containerId)
         {
-            var children = CatalogOrThrow().GetChildren(containerId);
+            var children = _catalog.GetChildren(containerId);
             if (children.Length == 0)
             {
                 // 叶子或空容器：返回空数组，避免调用方还要判空。
@@ -235,16 +195,14 @@ namespace LocalizationRuntime
         /// 递归展开容器的整棵子树，返回所有叶子文本。
         /// 适合"把一个多维数组拍平"这类场景。
         /// </summary>
-        public static string[] GetAllValues(int containerId)
+        public string[] GetAllValues(int containerId)
         {
-            var catalog = CatalogOrThrow();
             var sink = new List<string>();
-            CollectLeaves(catalog, containerId, sink, Volatile.Read(ref _snapshot).Values, 0);
+            CollectLeaves(containerId, sink, Volatile.Read(ref _snapshot).Values, 0);
             return sink.ToArray();
         }
 
-        private static void CollectLeaves(
-            ILocalizationCatalog catalog,
+        private void CollectLeaves(
             int id,
             List<string> sink,
             string[] table,
@@ -262,10 +220,10 @@ namespace LocalizationRuntime
                 return;
             }
 
-            var children = catalog.GetChildren(id);
+            var children = _catalog.GetChildren(id);
             for (var i = 0; i < children.Length; i++)
             {
-                CollectLeaves(catalog, children[i], sink, table, depth + 1);
+                CollectLeaves(children[i], sink, table, depth + 1);
             }
         }
 
@@ -276,28 +234,26 @@ namespace LocalizationRuntime
         /// 因此 <see cref="CurrentCulture"/> 报的是真正生效的语言，不会出现
         /// "报 de-DE、值是 zh-CN" 这种自相矛盾的状态。
         /// </summary>
-        public static bool SetCulture(CultureInfo culture)
+        public bool SetCulture(CultureInfo culture)
         {
             if (culture == null)
             {
                 throw new ArgumentNullException(nameof(culture));
             }
 
-            var catalog = CatalogOrThrow();
-
-            lock (Gate)
+            lock (_gate)
             {
                 var snapshot = Volatile.Read(ref _snapshot);
 
                 var current = culture.Name.Length == 0
-                    ? CultureInfo.GetCultureInfo(catalog.DefaultCultureName)
+                    ? CultureInfo.GetCultureInfo(_catalog.DefaultCultureName)
                     : culture;
 
                 // 不属于任何受支持语言（含其 Parent 链）时，落到基语言，
                 // 保证 CurrentCulture 与值的来源一致。
                 if (!_supported.Contains(current.Name))
                 {
-                    current = CultureInfo.GetCultureInfo(catalog.DefaultCultureName);
+                    current = CultureInfo.GetCultureInfo(_catalog.DefaultCultureName);
                 }
 
                 if (string.Equals(snapshot.Culture.Name, current.Name, StringComparison.OrdinalIgnoreCase))
@@ -306,44 +262,37 @@ namespace LocalizationRuntime
                 }
 
                 var revision = _nextRevision++;
-                Volatile.Write(
-                    ref _snapshot,
-                    new Snapshot(Resolve(catalog, _supported, current.Name), current, revision));
+                Volatile.Write(ref _snapshot, new Snapshot(Resolve(current.Name), current, revision));
                 return true;
             }
         }
 
-        private static CultureInfo DetectSystemCulture(
-            ILocalizationCatalog catalog,
-            HashSet<string> supported)
+        private CultureInfo DetectSystemCulture()
         {
             var system = CultureInfo.CurrentUICulture;
             for (var c = system; c != null && !string.IsNullOrEmpty(c.Name); c = c.Parent)
             {
-                if (supported.Contains(c.Name))
+                if (_supported.Contains(c.Name))
                 {
                     return CultureInfo.GetCultureInfo(c.Name);
                 }
             }
 
-            return CultureInfo.GetCultureInfo(catalog.DefaultCultureName);
+            return CultureInfo.GetCultureInfo(_catalog.DefaultCultureName);
         }
 
-        private static string[] Resolve(
-            ILocalizationCatalog catalog,
-            HashSet<string> supported,
-            string cultureName)
+        private string[] Resolve(string cultureName)
         {
-            lock (Resolved)
+            lock (_resolved)
             {
                 string[]? cached;
-                if (Resolved.TryGetValue(cultureName, out cached))
+                if (_resolved.TryGetValue(cultureName, out cached))
                 {
                     return cached;
                 }
 
-                var built = BuildResolved(catalog, supported, cultureName);
-                Resolved[cultureName] = built;
+                var built = BuildResolved(cultureName);
+                _resolved[cultureName] = built;
                 return built;
             }
         }
@@ -352,33 +301,30 @@ namespace LocalizationRuntime
         /// 沿 Parent 链合并成一张扁平表：ja-JP → ja → 基语言，逐键取第一个非 null 的值。
         /// 仍然缺失的槽位填入键路径，使热路径无需分支。
         /// </summary>
-        private static string[] BuildResolved(
-            ILocalizationCatalog catalog,
-            HashSet<string> supported,
-            string cultureName)
+        private string[] BuildResolved(string cultureName)
         {
-            var keys = catalog.Keys;
+            var keys = _catalog.Keys;
             var length = keys.Count;
 
             // 基语言本身：补齐空槽即可，无需逐键走链
-            if (string.Equals(cultureName, catalog.DefaultCultureName, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(cultureName, _catalog.DefaultCultureName, StringComparison.OrdinalIgnoreCase))
             {
-                return Materialize(catalog, catalog.GetTable(cultureName), length);
+                return Materialize(_catalog.GetTable(cultureName), length);
             }
 
-            var chain = BuildChain(catalog, supported, cultureName);
+            var chain = BuildChain(cultureName);
 
             // 链上只有一层（常见于二级 culture，如 ja-JP 直接命中）
             if (chain.Count == 1)
             {
-                return Materialize(catalog, catalog.GetTable(chain[0]), length);
+                return Materialize(_catalog.GetTable(chain[0]), length);
             }
 
             // 预先取表，避免在内层循环里反复查表
             var tables = new string?[chain.Count][];
             for (var i = 0; i < chain.Count; i++)
             {
-                tables[i] = catalog.GetTable(chain[i])!;
+                tables[i] = _catalog.GetTable(chain[i])!;
             }
 
             var result = new string[length];
@@ -404,13 +350,10 @@ namespace LocalizationRuntime
         }
 
         /// <summary>把一张可能含 null 的原始表补成不含 null 的数组。</summary>
-        private static string[] Materialize(
-            ILocalizationCatalog catalog,
-            string?[]? source,
-            int length)
+        private string[] Materialize(string?[]? source, int length)
         {
             var result = new string[length];
-            var keys = catalog.Keys;
+            var keys = _catalog.Keys;
 
             if (source == null)
             {
@@ -436,10 +379,7 @@ namespace LocalizationRuntime
             return result;
         }
 
-        private static List<string> BuildChain(
-            ILocalizationCatalog catalog,
-            HashSet<string> supported,
-            string cultureName)
+        private List<string> BuildChain(string cultureName)
         {
             var chain = new List<string>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -456,13 +396,13 @@ namespace LocalizationRuntime
 
             for (var c = culture; c != null && !string.IsNullOrEmpty(c.Name); c = c.Parent)
             {
-                if (supported.Contains(c.Name) && seen.Add(c.Name))
+                if (_supported.Contains(c.Name) && seen.Add(c.Name))
                 {
                     chain.Add(c.Name);
                 }
             }
 
-            var fallback = catalog.DefaultCultureName;
+            var fallback = _catalog.DefaultCultureName;
             if (seen.Add(fallback))
             {
                 chain.Add(fallback);

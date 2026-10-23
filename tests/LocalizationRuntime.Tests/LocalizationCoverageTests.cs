@@ -69,6 +69,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void EveryCultureHasTheSameKeySet()
         {
+            var l = new Localizer(Catalog.Instance);
             var zh = Flatten("zh-CN");
             var en = Flatten("en-US");
 
@@ -82,15 +83,16 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void EveryLeafIdIsNonEmptyInEveryCulture()
         {
+            var l = new Localizer(Catalog.Instance);
             var leafCount = Catalog.Instance.Keys.Count;
 
             foreach (var culture in Cultures)
             {
-                Localizer.Install(Catalog.Instance, CultureInfo.GetCultureInfo(culture));
+                var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo(culture));
 
                 for (var id = 0; id < leafCount; id++)
                 {
-                    var value = Localizer.Get(id);
+                    var value = localizer.Get(id);
                     Assert.False(
                         string.IsNullOrEmpty(value),
                         culture + " 的 id=" + id + "（键 " + Catalog.Instance.Keys[id] + "）取到空值");
@@ -105,12 +107,13 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void EveryCultureMatchesItsOwnJsonFile()
         {
+            var l = new Localizer(Catalog.Instance);
             var keys = Catalog.Instance.Keys;
             var problems = new List<string>();
 
             foreach (var culture in Cultures)
             {
-                Localizer.Install(Catalog.Instance, CultureInfo.GetCultureInfo(culture));
+                var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo(culture));
                 var expected = Flatten(culture);
 
                 for (var id = 0; id < keys.Count; id++)
@@ -122,7 +125,7 @@ namespace LocalizationRuntime.Tests
                         continue;
                     }
 
-                    var got = Localizer.Get(id);
+                    var got = localizer.Get(id);
                     if (!string.Equals(got, want, StringComparison.Ordinal))
                     {
                         problems.Add(
@@ -139,22 +142,23 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void SwitchingCultureChangesEveryValue()
         {
+            var l = new Localizer(Catalog.Instance);
             // 测试资源里两种语言的值全部不同，所以每个 id 都必须变化。
             var leafCount = Catalog.Instance.Keys.Count;
-            Localizer.Install(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
+            var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
 
             var before = new string[leafCount];
             for (var id = 0; id < leafCount; id++)
             {
-                before[id] = Localizer.Get(id);
+                before[id] = localizer.Get(id);
             }
 
-            Localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
+            l.SetCulture(CultureInfo.GetCultureInfo("en-US"));
 
             var unchanged = new List<string>();
             for (var id = 0; id < leafCount; id++)
             {
-                if (string.Equals(before[id], Localizer.Get(id), StringComparison.Ordinal))
+                if (string.Equals(before[id], l.Get(id), StringComparison.Ordinal))
                 {
                     unchanged.Add("id=" + id + " 键=" + Catalog.Instance.Keys[id]);
                 }
@@ -168,38 +172,38 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void UnknownCultureFallsBackToDefault()
         {
+            var l = new Localizer(Catalog.Instance);
             var leafCount = Catalog.Instance.Keys.Count;
 
             // 先记录基语言的实际值，再切到不受支持的 de-DE 对比。
-            Localizer.Install(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
+            var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
             var expected = new string[leafCount];
             for (var id = 0; id < leafCount; id++)
             {
-                expected[id] = Localizer.Get(id);
+                expected[id] = localizer.Get(id);
             }
 
-            Localizer.Install(Catalog.Instance, CultureInfo.GetCultureInfo("de-DE"));
-
             // 不受支持的语言应落到基语言，CurrentCulture 与值的来源必须一致。
-            Assert.Equal("zh-CN", Localizer.CurrentCulture.Name);
+            Assert.Equal("zh-CN", l.CurrentCulture.Name);
 
             for (var id = 0; id < leafCount; id++)
             {
-                Assert.Equal(expected[id], Localizer.Get(id));
+                Assert.Equal(expected[id], l.Get(id));
             }
         }
 
         [Fact]
         public void ReSwitchingIsIdempotentForValues()
         {
-            Localizer.Install(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
+            var l = new Localizer(Catalog.Instance);
+            var localizer = new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
 
-            var first = Enumerable.Range(0, Catalog.Instance.Keys.Count).Select(Localizer.Get).ToArray();
+            var first = Enumerable.Range(0, Catalog.Instance.Keys.Count).Select(localizer.Get).ToArray();
 
-            Localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
-            Localizer.SetCulture(CultureInfo.GetCultureInfo("zh-CN"));
+            localizer.SetCulture(CultureInfo.GetCultureInfo("en-US"));
+            localizer.SetCulture(CultureInfo.GetCultureInfo("zh-CN"));
 
-            var again = Enumerable.Range(0, Catalog.Instance.Keys.Count).Select(Localizer.Get).ToArray();
+            var again = Enumerable.Range(0, Catalog.Instance.Keys.Count).Select(localizer.Get).ToArray();
 
             Assert.Equal(first, again);
         }
@@ -213,6 +217,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void ConstantTreeCoversEveryNonLeafNode()
         {
+            var l = new Localizer(Catalog.Instance);
             var leafCount = Catalog.Instance.Keys.Count;
 
             var json = File.ReadAllText(ResourcePath("zh-CN"));
@@ -286,6 +291,12 @@ namespace LocalizationRuntime.Tests
         }
     }
 }
+
+
+
+
+
+
 
 
 

@@ -19,142 +19,144 @@ namespace LocalizationRuntime.Tests
     /// </summary>
     public sealed class LocalizationIdsValueTests
     {
-        /// <summary>每个用例先把当前语言设为 zh-CN，之后直接用静态 API。</summary>
-        private static void UseZh()
+        /// <summary>构造一个 zh-CN 的 localizer。</summary>
+        private static Localizer Zh()
         {
-            Localizer.Install(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
+            return new Localizer(Catalog.Instance, CultureInfo.GetCultureInfo("zh-CN"));
         }
 
         [Fact]
         public void ScalarValue()
         {
-            Assert.Equal("v01-scalar", Localizer.Get(LocalizationIds.Scalar));
+            var l = Zh();
+            Assert.Equal("v01-scalar", l.Get(LocalizationIds.Scalar));
         }
 
         [Fact]
         public void PlainObjectValues()
         {
-            UseZh();
+            var l = Zh();
 
-            Assert.Equal("v03-group-a", Localizer.Get(LocalizationIds.GroupObject.A));
-            Assert.Equal("v05-deep-b", Localizer.Get(LocalizationIds.GroupObject.DeepObject.B));
-            Assert.Equal("v06-deep-c-d", Localizer.Get(LocalizationIds.GroupObject.DeepObject.CObject.D));
+            Assert.Equal("v03-group-a", l.Get(LocalizationIds.GroupObject.A));
+            Assert.Equal("v05-deep-b", l.Get(LocalizationIds.GroupObject.DeepObject.B));
+            Assert.Equal("v06-deep-c-d", l.Get(LocalizationIds.GroupObject.DeepObject.CObject.D));
         }
 
         [Fact]
         public void DeeplyNestedObjectValues()
         {
-            UseZh();
+            var l = Zh();
 
             Assert.Equal("v36-obwithobj-l1-l2-leaf",
-                Localizer.Get(LocalizationIds.ObjWithObjObject.Level1Object.Level2Object.Leaf));
+                l.Get(LocalizationIds.ObjWithObjObject.Level1Object.Level2Object.Leaf));
             Assert.Equal("v37-obwithobj-l1-sibling",
-                Localizer.Get(LocalizationIds.ObjWithObjObject.Level1Object.Sibling));
+                l.Get(LocalizationIds.ObjWithObjObject.Level1Object.Sibling));
         }
 
         [Fact]
         public void StringArrayValues()
         {
-            UseZh();
+            var l = Zh();
 
-            Assert.Equal("v08-strarr-0", Localizer.Get(LocalizationIds.StrArrObject.StrArrItem0));
-            Assert.Equal("v09-strarr-1", Localizer.Get(LocalizationIds.StrArrObject.StrArrItem1));
-            Assert.Equal("v10-strarr-2", Localizer.Get(LocalizationIds.StrArrObject.StrArrItem2));
+            Assert.Equal("v08-strarr-0", l.Get(LocalizationIds.StrArrObject.StrArrItem0));
+            Assert.Equal("v09-strarr-1", l.Get(LocalizationIds.StrArrObject.StrArrItem1));
+            Assert.Equal("v10-strarr-2", l.Get(LocalizationIds.StrArrObject.StrArrItem2));
         }
 
         [Fact]
         public void SingleElementArrayValue()
         {
+            var l = Zh();
             Assert.Equal("v11-onestrarr-0",
-                Localizer.Get(LocalizationIds.OneStrArrObject.OneStrArrItem0));
+                l.Get(LocalizationIds.OneStrArrObject.OneStrArrItem0));
         }
 
         [Fact]
         public void ObjectArrayValues()
         {
-            UseZh();
+            var l = Zh();
 
-            Assert.Equal("v12-objarr-0-k", Localizer.Get(LocalizationIds.ObjArrObject.ObjArrItem0Object.K));
-            Assert.Equal("v13-objarr-1-k", Localizer.Get(LocalizationIds.ObjArrObject.ObjArrItem1Object.K));
+            Assert.Equal("v12-objarr-0-k", l.Get(LocalizationIds.ObjArrObject.ObjArrItem0Object.K));
+            Assert.Equal("v13-objarr-1-k", l.Get(LocalizationIds.ObjArrObject.ObjArrItem1Object.K));
         }
 
         [Fact]
         public void NestedStringArrayValues()
         {
-            UseZh();
+            var l = Zh();
 
             Assert.Equal("v14-arrarr-0-0",
-                Localizer.Get(LocalizationIds.ArrArrObject.ArrArrItem0Object.ArrArrItem0Item0));
+                l.Get(LocalizationIds.ArrArrObject.ArrArrItem0Object.ArrArrItem0Item0));
             Assert.Equal("v15-arrarr-0-1",
-                Localizer.Get(LocalizationIds.ArrArrObject.ArrArrItem0Object.ArrArrItem0Item1));
+                l.Get(LocalizationIds.ArrArrObject.ArrArrItem0Object.ArrArrItem0Item1));
             Assert.Equal("v16-arrarr-1-0",
-                Localizer.Get(LocalizationIds.ArrArrObject.ArrArrItem1Object.ArrArrItem1Item0));
+                l.Get(LocalizationIds.ArrArrObject.ArrArrItem1Object.ArrArrItem1Item0));
         }
 
         [Fact]
         public void NestedObjectArrayValues()
         {
-            UseZh();
+            var l = Zh();
 
-            Assert.Equal("v17-objarrarr-0-0-v", Localizer.Get(
+            Assert.Equal("v17-objarrarr-0-0-v", l.Get(
                 LocalizationIds.ObjArrArrObject.ObjArrArrItem0Object.ObjArrArrItem0Item0Object.V));
-            Assert.Equal("v18-objarrarr-0-1-v", Localizer.Get(
+            Assert.Equal("v18-objarrarr-0-1-v", l.Get(
                 LocalizationIds.ObjArrArrObject.ObjArrArrItem0Object.ObjArrArrItem0Item1Object.V));
-            Assert.Equal("v19-objarrarr-1-0-v", Localizer.Get(
+            Assert.Equal("v19-objarrarr-1-0-v", l.Get(
                 LocalizationIds.ObjArrArrObject.ObjArrArrItem1Object.ObjArrArrItem1Item0Object.V));
         }
 
         [Fact]
         public void ArrayInsideObjectElementValues()
         {
-            UseZh();
+            var l = Zh();
 
             Assert.Equal("v20-arrobj-0-sub-0",
-                Localizer.Get(LocalizationIds.ArrObjObject.ArrObjItem0Object.SubObject.SubItem0));
+                l.Get(LocalizationIds.ArrObjObject.ArrObjItem0Object.SubObject.SubItem0));
             Assert.Equal("v21-arrobj-0-sub-1",
-                Localizer.Get(LocalizationIds.ArrObjObject.ArrObjItem0Object.SubObject.SubItem1));
+                l.Get(LocalizationIds.ArrObjObject.ArrObjItem0Object.SubObject.SubItem1));
             Assert.Equal("v22-arobj-1-sub-0",
-                Localizer.Get(LocalizationIds.ArrObjObject.ArrObjItem1Object.SubObject.SubItem0));
+                l.Get(LocalizationIds.ArrObjObject.ArrObjItem1Object.SubObject.SubItem0));
         }
 
         [Fact]
         public void ThreeDimensionalArrayValues()
         {
-            UseZh();
+            var l = Zh();
 
-            Assert.Equal("v23-cube-0-0-0", Localizer.Get(
+            Assert.Equal("v23-cube-0-0-0", l.Get(
                 LocalizationIds.CubeObject.CubeItem0Object.CubeItem0Item0Object.CubeItem0Item0Item0));
-            Assert.Equal("v24-cube-0-1-0", Localizer.Get(
+            Assert.Equal("v24-cube-0-1-0", l.Get(
                 LocalizationIds.CubeObject.CubeItem0Object.CubeItem0Item1Object.CubeItem0Item1Item0));
-            Assert.Equal("v25-cube-1-0-0", Localizer.Get(
+            Assert.Equal("v25-cube-1-0-0", l.Get(
                 LocalizationIds.CubeObject.CubeItem1Object.CubeItem1Item0Object.CubeItem1Item0Item0));
         }
 
         [Fact]
         public void GridValues()
         {
-            UseZh();
+            var l = Zh();
 
-            Assert.Equal("v26-grid-0-0-h", Localizer.Get(LocalizationIds.GridObject.GridItem0Object.GridItem0Item0Object.H));
-            Assert.Equal("v27-grid-0-0-w", Localizer.Get(LocalizationIds.GridObject.GridItem0Object.GridItem0Item0Object.W));
-            Assert.Equal("v28-grid-1-0-h", Localizer.Get(LocalizationIds.GridObject.GridItem1Object.GridItem1Item0Object.H));
-            Assert.Equal("v29-grid-1-0-w", Localizer.Get(LocalizationIds.GridObject.GridItem1Object.GridItem1Item0Object.W));
+            Assert.Equal("v26-grid-0-0-h", l.Get(LocalizationIds.GridObject.GridItem0Object.GridItem0Item0Object.H));
+            Assert.Equal("v27-grid-0-0-w", l.Get(LocalizationIds.GridObject.GridItem0Object.GridItem0Item0Object.W));
+            Assert.Equal("v28-grid-1-0-h", l.Get(LocalizationIds.GridObject.GridItem1Object.GridItem1Item0Object.H));
+            Assert.Equal("v29-grid-1-0-w", l.Get(LocalizationIds.GridObject.GridItem1Object.GridItem1Item0Object.W));
         }
 
         [Fact]
         public void DeepObjectArrayValues()
         {
-            UseZh();
+            var l = Zh();
 
-            Assert.Equal("v30-deepobjarr-0-name", Localizer.Get(LocalizationIds.DeepObjArrObject.DeepObjArrItem0Object.Name));
+            Assert.Equal("v30-deepobjarr-0-name", l.Get(LocalizationIds.DeepObjArrObject.DeepObjArrItem0Object.Name));
 
-            Assert.Equal("v31-deepobjarr-0-inner-0-x", Localizer.Get(
+            Assert.Equal("v31-deepobjarr-0-inner-0-x", l.Get(
                 LocalizationIds.DeepObjArrObject.DeepObjArrItem0Object.InnerObject.InnerItem0Object.X));
-            Assert.Equal("v32-deepobjarr-0-inner-0-y", Localizer.Get(
+            Assert.Equal("v32-deepobjarr-0-inner-0-y", l.Get(
                 LocalizationIds.DeepObjArrObject.DeepObjArrItem0Object.InnerObject.InnerItem0Object.Y));
-            Assert.Equal("v33-deepobjarr-0-inner-1-x", Localizer.Get(
+            Assert.Equal("v33-deepobjarr-0-inner-1-x", l.Get(
                 LocalizationIds.DeepObjArrObject.DeepObjArrItem0Object.InnerObject.InnerItem1Object.X));
-            Assert.Equal("v34-deepobjarr-0-inner-1-y", Localizer.Get(
+            Assert.Equal("v34-deepobjarr-0-inner-1-y", l.Get(
                 LocalizationIds.DeepObjArrObject.DeepObjArrItem0Object.InnerObject.InnerItem1Object.Y));
         }
 
@@ -165,7 +167,7 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void AllLeafValuesAreGloballyUnique()
         {
-            UseZh();
+            var l = Zh();
             var leafCount = Catalog.Instance.Keys.Count;
 
             var seen = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -173,7 +175,7 @@ namespace LocalizationRuntime.Tests
 
             for (var id = 0; id < leafCount; id++)
             {
-                var value = Localizer.Get(id);
+                var value = l.Get(id);
 
                 int firstId;
                 if (seen.TryGetValue(value, out firstId))
@@ -204,10 +206,14 @@ namespace LocalizationRuntime.Tests
         [Fact]
         public void LeafCountMatchesResource()
         {
+            var l = Zh();
             Assert.Equal(ExpectedLeafCount, Catalog.Instance.Keys.Count);
         }
     }
 }
+
+
+
 
 
 
