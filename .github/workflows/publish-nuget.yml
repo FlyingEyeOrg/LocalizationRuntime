@@ -66,19 +66,43 @@ jobs:
       - name: Test
         run: dotnet run --project tests/LocalizationRuntime.Tests.Runner -c Release --no-build
 
+      # 不用 --no-build：让 pack 自己编译一次，保证 nupkg 里的 dll 与
+      # snupkg 里的 pdb 出自同一次编译。用 --no-build 时两者依赖 obj/ 的
+      # 残留状态，CI 上曾因此出现 pdb 与 dll 不配套（nuget.org 拒收符号包）。
       - name: Pack LocalizationRuntime
         run: >
           dotnet pack src/LocalizationRuntime/LocalizationRuntime.csproj
-          -c Release --no-build --no-restore -o artifacts
+          -c Release --no-restore -o artifacts
           -p:PackageVersion=${{ steps.version.outputs.version }}
           -p:ContinuousIntegrationBuild=true
 
       - name: Pack LocalizationRuntime.Generator
         run: >
           dotnet pack src/LocalizationRuntime.Generator/LocalizationRuntime.Generator.csproj
-          -c Release --no-build --no-restore -o artifacts
+          -c Release --no-restore -o artifacts
           -p:PackageVersion=${{ steps.version.outputs.version }}
           -p:ContinuousIntegrationBuild=true
+
+      # 打印实际打进包的 dll/pdb，便于对照 CI 与本地的差异。
+      - name: Show packaged symbols
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          foreach ($pkg in Get-ChildItem artifacts -Filter *.snupkg) {
+              Write-Output "== $($pkg.Name) =="
+              $zip = [System.IO.Compression.ZipFile]::OpenRead($pkg.FullName)
+              $zip.Entries | Where-Object { $_.FullName -like 'lib/*' } |
+                  ForEach-Object { Write-Output ("   {0}  {1}" -f $_.FullName, $_.Length) }
+              $zip.Dispose()
+          }
+
+      # 推之前先自检：符号包与主包必须配套，否则 nuget.org 会在推送阶段才拒收，
+      # 报的还只是"pdb 找不到对应 dll"，看不出是哪个 TFM。
+      - name: Verify symbol packages
+        shell: pwsh
+        run: |
+          ./eng/verify-symbols.ps1 -ArtifactsDirectory artifacts -PackageId LocalizationRuntime
+          if ($LASTEXITCODE -ne 0) { throw "符号包校验失败" }
 
       - name: Upload NuGet packages
         uses: actions/upload-artifact@v4
