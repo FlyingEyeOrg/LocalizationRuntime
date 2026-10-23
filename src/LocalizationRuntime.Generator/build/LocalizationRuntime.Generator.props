@@ -17,9 +17,6 @@
     <!-- 基语言：定义键集合，也是其它语言缺键时的回退目标 -->
     <LocalizationDefaultCulture Condition="'$(LocalizationDefaultCulture)' == ''">zh-CN</LocalizationDefaultCulture>
 
-    <!-- 生成的门面类名，与 LocalizationKeys 一起构成 {ClassName} / {ClassName}Keys -->
-    <LocalizationClassName Condition="'$(LocalizationClassName)' == ''">L</LocalizationClassName>
-
     <!-- 生成代码的命名空间后缀，最终为 RootNamespace + 后缀 -->
     <LocalizationNamespaceSuffix Condition="'$(LocalizationNamespaceSuffix)' == ''">.Localization</LocalizationNamespaceSuffix>
 
@@ -39,7 +36,6 @@
   <ItemGroup>
     <CompilerVisibleProperty Include="RootNamespace" />
     <CompilerVisibleProperty Include="LocalizationDefaultCulture" />
-    <CompilerVisibleProperty Include="LocalizationClassName" />
     <CompilerVisibleProperty Include="LocalizationNamespaceSuffix" />
     <CompilerVisibleProperty Include="LocalizationSuppressedDiagnostics" />
     <CompilerVisibleProperty Include="LocalizationDiagnosticsAsErrors" />

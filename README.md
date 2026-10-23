@@ -218,7 +218,6 @@ dotnet_diagnostic.LR1006.severity = error
 |---|---|---|
 | `LocalizationDirectory` | `Localization` | 资源目录，可写多级（`Resources\I18n`） |
 | `LocalizationDefaultCulture` | `zh-CN` | 基语言：定义键集合，也是回退目标 |
-| `LocalizationClassName` | `L` | 生成的门面类名 |
 | `LocalizationNamespaceSuffix` | `.Localization` | 命名空间后缀，最终为 `RootNamespace` + 后缀 |
 | `EnableLocalizationRuntimeAutoIncludes` | `true` | 设为 `false` 可关闭自动挂载，手写 `AdditionalFiles` |
 
@@ -236,7 +235,7 @@ dotnet_diagnostic.LR1006.severity = error
 ```
 ```bash
 # ③ 命令行
-dotnet build -p:LocalizationClassName=Strings
+dotnet build -p:LocalizationDefaultCulture=en-US
 ```
 
 默认值与挂载逻辑故意分开放：默认值在包内 `build/*.props`（csproj 之前求值），

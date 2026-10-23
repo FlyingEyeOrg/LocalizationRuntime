@@ -32,7 +32,6 @@ namespace LocalizationRuntime.Generator
             var settings = context.AnalyzerConfigOptionsProvider
                 .Select(static (p, _) => new Settings(
                     GetOption(p, "build_property.RootNamespace") ?? "Localization",
-                    GetOption(p, "build_property.LocalizationClassName") ?? "L",
                     GetOption(p, "build_property.LocalizationNamespaceSuffix") ?? ".Localization",
                     GetOption(p, "build_property.LocalizationDefaultCulture") ?? "zh-CN"));
 
@@ -115,7 +114,7 @@ namespace LocalizationRuntime.Generator
                     1, 1, string.Empty));
 
                 return new ResourceModel(
-                    settings.Namespace, settings.ClassName, settings.DefaultCulture,
+                    settings.Namespace, settings.DefaultCulture,
                     new KeyDef[0], new CultureTable[0], diagnostics.ToArray());
             }
 
@@ -157,7 +156,7 @@ namespace LocalizationRuntime.Generator
             if (parsed.Count == 0)
             {
                 return new ResourceModel(
-                    settings.Namespace, settings.ClassName, settings.DefaultCulture,
+                    settings.Namespace, settings.DefaultCulture,
                     new KeyDef[0], new CultureTable[0], diagnostics.ToArray());
             }
 
@@ -182,7 +181,7 @@ namespace LocalizationRuntime.Generator
                     1, 1, string.Empty));
 
                 return new ResourceModel(
-                    settings.Namespace, settings.ClassName, settings.DefaultCulture,
+                    settings.Namespace, settings.DefaultCulture,
                     new KeyDef[0], new CultureTable[0], diagnostics.ToArray());
             }
 
@@ -315,7 +314,7 @@ namespace LocalizationRuntime.Generator
 
             return new ResourceModel(
                 settings.Namespace,
-                settings.ClassName,
+
                 defaultFile.Culture,
                 keys,
                 cultures.ToArray(),
@@ -1084,16 +1083,13 @@ namespace LocalizationRuntime.Generator
 
     internal readonly struct Settings
     {
-        public Settings(string rootNamespace, string className, string namespaceSuffix, string defaultCulture)
+        public Settings(string rootNamespace, string namespaceSuffix, string defaultCulture)
         {
             Namespace = rootNamespace + namespaceSuffix;
-            ClassName = className;
             DefaultCulture = defaultCulture;
         }
 
         public string Namespace { get; }
-
-        public string ClassName { get; }
 
         public string DefaultCulture { get; }
     }

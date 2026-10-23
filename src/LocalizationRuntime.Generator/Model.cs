@@ -136,14 +136,12 @@ namespace LocalizationRuntime.Generator
     {
         public ResourceModel(
             string ns,
-            string className,
             string defaultCulture,
             KeyDef[] keys,
             CultureTable[] cultures,
             DiagnosticItem[] diagnostics)
         {
             Namespace = ns;
-            ClassName = className;
             DefaultCulture = defaultCulture;
             Keys = keys;
             Cultures = cultures;
@@ -151,8 +149,6 @@ namespace LocalizationRuntime.Generator
         }
 
         public string Namespace { get; }
-
-        public string ClassName { get; }
 
         public string DefaultCulture { get; }
 
@@ -171,7 +167,7 @@ namespace LocalizationRuntime.Generator
         {
             if (other == null
                 || !string.Equals(Namespace, other.Namespace, StringComparison.Ordinal)
-                || !string.Equals(ClassName, other.ClassName, StringComparison.Ordinal)
+
                 || !string.Equals(DefaultCulture, other.DefaultCulture, StringComparison.Ordinal)
                 || Keys.Length != other.Keys.Length
                 || Cultures.Length != other.Cultures.Length
